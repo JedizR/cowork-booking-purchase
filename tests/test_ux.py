@@ -209,7 +209,8 @@ def test_pur_r34_dashboard_leads_with_today_and_coming_up(app):
     op, a = member(app, "operator@example.com", "Op"), member(app)
     html = words(op.get("/dashboard").get_data(as_text=True))
     assert "No bookings today." in html and "Nothing booked after today yet." in html
-    assert "No booking started in these 7 days" in html  # a line in the tile, not a bare 0
+    assert "No booking started in these 7 days" in html  # a line under the figure, which is still shown
+    assert "Utilization 0.0 %" in html and "Members who booked 0 No confirmed booking yet" in html  # PUR-R34
     now = book_json(a, space_id=4, start="2026-10-05T12:00:00+07:00", blocks=2, party_size=1).get_json()["reference"]
     later = book_json(a, space_id=4, start="2026-10-07T09:00:00+07:00", party_size=1).get_json()["reference"]
     html = op.get("/dashboard").get_data(as_text=True)

@@ -323,8 +323,8 @@ a.slot[data-mine]:focus-visible .slot-body { outline: 2px solid var(--black); ou
 .attention-alert { margin-bottom: var(--sp-5); border: 1.5px solid var(--ink); }
 .attention-alert .alert-icon { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
 .dash-now { align-items: start; margin-bottom: var(--sp-7); }
+.dash-now.is-quiet { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }  /* nothing today: one line, not half a row of blank */
 .dash-empty { margin: 0; font-size: var(--fs-callout); color: var(--muted); }
-.stat-empty { margin-top: var(--sp-2); font-size: var(--fs-callout); color: var(--muted); line-height: 1.4; }
 .agenda { list-style: none; margin: 0; padding: 0; }
 .agenda-day { padding: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-fine); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .agenda-day:first-child { padding-top: 0; }
