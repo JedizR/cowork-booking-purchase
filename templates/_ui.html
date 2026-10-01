@@ -1,0 +1,54 @@
+{# Shared bits. Flashes are the one-time outcome of the last form (PUR-R36); their look is read from the text. #}
+{% macro flashes() %}
+  {% set messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="flashes">
+      {% for m in messages %}{% set kind = m|flash_kind %}
+        <li class="flash{% if kind != 'info' %} flash-{{ kind }}{% endif %}" role="{{ 'alert' if kind == 'error' else 'status' }}"><span class="flash-icon" aria-hidden="true"></span><span>{{ m }}</span></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{# Booking status as fill plus words (DESIGN status map, PUR-R28). Completed is derived from the end. #}
+{% macro status_badge(b, now, unknown=False) %}
+  {%- if b.status == "confirmed" and now >= b.end_at -%}<span class="badge badge-muted">Completed</span>
+  {%- elif b.status == "confirmed" -%}<span class="badge badge-solid">Confirmed</span>
+  {%- elif b.status == "held" and unknown -%}<span class="badge badge-attention">Payment status unknown</span>
+  {%- elif b.status == "held" -%}<span class="badge badge-outline">Held</span>
+  {%- elif b.status == "cancelled" and b.refund_status == "failed" -%}<span class="badge badge-attention">Refund failed</span>
+  {%- else -%}<span class="badge badge-muted">{{ b.status|capitalize }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro empty(title, text, icon="calendar") %}
+  <div class="empty">
+    <div class="empty-icon" aria-hidden="true">{{ glyph(icon) }}</div>
+    <h2 class="empty-title">{{ title }}</h2>
+    {% if text %}<p class="empty-text">{{ text }}</p>{% endif %}
+    {{ caller() if caller }}
+  </div>
+{% endmacro %}
+
+{% macro glyph(name) -%}
+  {%- if name == "calendar" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+  {%- elif name == "room" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5V20M2.5 20h19M16 9h3.5v11M12.5 12.5v1"/></svg>
+  {%- elif name == "search" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+  {%- elif name == "check" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+  {%- endif -%}
+{%- endmacro %}
+
+{# The operator section's tabs (PUR-R06). #}
+{% macro operator_nav(active) %}
+  <div class="subnav">
+    <div class="subnav-inner">
+      <span class="subnav-title">Operator</span>
+      <nav class="tabs" aria-label="Operator">
+        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "Bookings"), ("/operator/spaces", "spaces", "Spaces"), ("/operator/members", "members", "Members")] %}
+          <a href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+        <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </div>
+{% endmacro %}

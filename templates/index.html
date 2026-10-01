@@ -1,15 +1,36 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Spaces{% endblock %}
 {% block content %}
-  <h1>Spaces</h1>
-  {% if not spaces %}<p>No spaces to book yet.</p>{% endif %}
-  <ul class="list">
-    {% for s in spaces %}
-      <li>
-        <a href="/spaces/{{ s.id }}"><strong>{{ s.name }}</strong></a>
-        <div>Up to {{ s.capacity }} people</div>
-        <div>{{ s.hourly_rate_satang|money }} per hour, {{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min</div>
-      </li>
-    {% endfor %}
-  </ul>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Spaces</p>
+      <h1 class="page-title">Book a room by the half hour</h1>
+      <p class="page-subtitle">Pick a room, then choose your time on the day. From 30 minutes to 4 hours, between 08:00 and 20:00.</p>
+    </div>
+  </header>
+  {% if not spaces %}
+    {% call ui.empty("No spaces to book yet.", "Rooms appear here once the operator adds them.", "room") %}{% endcall %}
+  {% else %}
+    <div class="grid-3 space-grid">
+      {% for s in spaces %}
+        {% set free = s.hourly_rate_satang == 0 %}
+        <a class="space-card" href="/spaces/{{ s.id }}">
+          <div class="space-card-cover">
+            <div class="space-card-top">
+              <span class="space-card-room">Room {{ s.id }}</span>
+              {% if free %}<span class="badge badge-solid">Free</span>
+              {% elif me and me.plan_active %}<span class="badge badge-solid">Plan covers this</span>{% endif %}
+            </div>
+            <div class="space-card-mark space-card-initials"><b>{{ (s.name.split()|map("first")|join|upper)[:2] }}</b></div>
+          </div>
+          <div class="space-card-body">
+            <h2 class="space-card-title">{{ s.name }}</h2>
+            <p class="space-card-meta">Up to {{ s.capacity }} {{ "person" if s.capacity == 1 else "people" }}</p>
+            <p class="space-card-price">{% if free %}Free · THB 0.00 per hour{% else %}{{ s.hourly_rate_satang|money }} per hour, {{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min{% endif %}</p>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
 {% endblock %}

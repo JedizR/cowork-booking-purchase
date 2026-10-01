@@ -1,33 +1,70 @@
 <!doctype html>
+{% import "_ui.html" as ui with context %}
+{% set path = request.path %}
+{% macro nav(href, label, active=False) %}<a href="{{ href }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>{% endmacro %}
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cowork Booking — {% block title %}{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='purchase.css') }}">
+    <script src="{{ url_for('static', filename='purchase.js') }}" defer></script>
   </head>
   <body>
-    <nav class="site-nav">
-      <a class="brand" href="/">Cowork Booking</a>
-      <a href="/">Spaces</a>
-      {% if me %}
-        <a href="/bookings/mine">My bookings</a>
-        {% if me.is_operator %}
-          <a href="/operator/bookings">All bookings</a>
-          <a href="/operator/spaces">Spaces admin</a>
-          <a href="/operator/members">Members</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="{{ payment_public_url }}/operator">Payment totals</a>
-        {% endif %}
-        <span class="spacer"></span>
-        <span>{{ me.display_name }} ({{ me.email }})</span>
-        <form method="post" action="/logout"><button type="submit">Log out</button></form>
-      {% else %}
-        <span class="spacer"></span>
-        <a href="/login">Log in</a> <a href="/register">Sign up</a>
-      {% endif %}
-    </nav>
-    {% for m in get_flashed_messages() %}<p class="message">{{ m }}</p>{% endfor %}
-    {% block content %}{% endblock %}
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topnav">
+      <div class="topnav-inner">
+        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">C</span>Cowork Booking</a>
+        <nav class="topnav-links" aria-label="Main">
+          {{ nav("/", "Spaces", path == "/" or path.startswith("/spaces")) }}
+          {% if me %}
+            {{ nav("/bookings/mine", "My bookings", path == "/bookings/mine") }}
+            {% if me.is_operator %}
+              {% set in_op = path == "/dashboard" or path.startswith("/operator") %}
+              <details class="topnav-menu">
+                <summary{% if in_op %} class="is-active"{% endif %}>Operator</summary>
+                <div class="topnav-menu-panel">
+                  {{ nav("/dashboard", "Dashboard", path == "/dashboard") }}
+                  {{ nav("/operator/bookings", "All bookings", path == "/operator/bookings") }}
+                  {{ nav("/operator/spaces", "Spaces admin", path == "/operator/spaces") }}
+                  {{ nav("/operator/members", "Members", path == "/operator/members") }}
+                  <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
+                </div>
+              </details>
+            {% endif %}
+          {% endif %}
+        </nav>
+        <div class="topnav-right">
+          {% if me %}
+            <span class="topnav-user" title="{{ me.display_name }} ({{ me.email }})"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }} ({{ me.email }})</span></span>
+            <form method="post" action="/logout"><button class="topnav-btn" type="submit">Log out</button></form>
+          {% else %}
+            <a class="topnav-link" href="/login">Log in</a>
+            <a class="topnav-btn topnav-btn-solid" href="/register">Sign up</a>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+    {% block subnav %}{% endblock %}
+    <main class="page{% block page_class %}{% endblock %}" id="main">
+      {% block page %}
+        <div class="container{% block width %}{% endblock %}">
+          {% block flashes %}{{ ui.flashes() }}{% endblock %}
+          {% block content %}{% endblock %}
+        </div>
+      {% endblock %}
+    </main>
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span>Cowork Booking · times in Bangkok (UTC+7) · prices in THB</span>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="/">Spaces</a>
+          {% if me %}<a href="/bookings/mine">My bookings</a>{% else %}<a href="/login">Log in</a>{% endif %}
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

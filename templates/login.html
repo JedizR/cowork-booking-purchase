@@ -1,11 +1,27 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Log in{% endblock %}
+{% block width %} container-narrow{% endblock %}
+{% block flashes %}{% endblock %}
 {% block content %}
-  <h1>Log in</h1>
-  <form method="post" action="/login">
-    <input type="email" name="email" placeholder="Email" required>
-    <input type="password" name="password" placeholder="Password" required>
-    <button type="submit">Log in</button>
-  </form>
-  <p class="hint">New here? <a href="/register">Sign up</a></p>
+  <section class="auth">
+    <header class="auth-header">
+      <span class="brand-mark auth-mark" aria-hidden="true">C</span>
+      <h1 class="page-title">Log in</h1>
+      <p class="page-subtitle">Book rooms by the half hour and keep every ticket in one place.</p>
+    </header>
+    <form class="card auth-card stack stack-sm" method="post" action="/login">
+      {{ ui.flashes() }}
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" autocomplete="email" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Log in</button>
+    </form>
+    <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+  </section>
 {% endblock %}
