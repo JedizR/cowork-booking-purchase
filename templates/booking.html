@@ -12,7 +12,7 @@
   {% set retry_action = "/operator/bookings/" ~ b.reference ~ "/retry" if op else "/bookings/" ~ b.reference ~ "/retry" %}
   {% macro retry(label="Retry", primary=False) %}<form method="post" action="{{ retry_action }}" class="inline"><input type="hidden" name="return_to" value="booking"><button class="btn {{ 'btn-primary' if primary else 'btn-secondary btn-utility' }}" type="submit">{{ label }}</button></form>{% endmacro %}
   {% macro cancel_link(label="Cancel booking") %}<a class="btn btn-secondary" href="/bookings/{{ b.reference }}/cancel{% if op %}?return_to=booking{% endif %}">{{ label }}</a>{% endmacro %}
-  {% macro reconcile() %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile" class="inline"><input type="hidden" name="return_to" value="booking"><button class="btn btn-ghost btn-utility" type="submit">Reconcile</button></form>{% endmacro %}
+  {% macro reconcile() %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile" class="inline"><input type="hidden" name="return_to" value="booking"><button class="btn btn-secondary btn-utility" type="submit">Reconcile</button></form>{% endmacro %}
   {% macro line(icon="i") %}<div class="status-line"><span class="status-dot" aria-hidden="true">{{ icon }}</span><div class="status-text">{{ caller() }}</div></div>{% endmacro %}
 
   {% set ended = completed or b.status in ("expired", "cancelled") %}
@@ -122,7 +122,7 @@
           {% set can_cancel = not completed and (op or not started) %}
           {% if not completed %}
             <div class="card-footer">
-              <a class="btn btn-ghost" href="/bookings/{{ b.reference }}/calendar.ics">{{ ui.glyph("calendar") }}Add to calendar</a>
+              <a class="btn" href="/bookings/{{ b.reference }}/calendar.ics">{{ ui.glyph("calendar") }}Add to calendar</a>
               {% if can_cancel %}{{ cancel_link() }}{% endif %}
             </div>
           {% endif %}

@@ -75,8 +75,8 @@
                       {%- if f == "refund_failed" %}Retry refund · {{ b.refund_amount_satang|money }}{% elif f == "refund_pending" %}Resend refund{% elif f == "revocation_pending" %}Retry revoke{% else %}Retry ticket{% endif -%}
                     </button></form>
                   {% endif %}
-                  {% if b.status == "held" %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile"><input type="hidden" name="return_to" value="bookings"><button class="btn btn-utility" type="submit">Reconcile</button></form>{% endif %}
-                  {% if b.status == "held" or (b.status == "confirmed" and now < b.end_at) %}<a class="btn btn-ghost btn-utility" href="/bookings/{{ b.reference }}/cancel">Cancel</a>{% endif %}
+                  {% if b.status == "held" %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile"><input type="hidden" name="return_to" value="bookings"><button class="btn btn-secondary btn-utility" type="submit">Reconcile</button></form>{% endif %}
+                  {% if b.status == "held" or (b.status == "confirmed" and now < b.end_at) %}<a class="btn btn-secondary btn-utility" href="/bookings/{{ b.reference }}/cancel">Cancel</a>{% endif %}
                 </td>
               </tr>
             {% endfor %}

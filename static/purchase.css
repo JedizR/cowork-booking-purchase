@@ -344,7 +344,7 @@
   .table-stack td.row-actions > form { flex: 1 1 auto; }
   .table-stack td.row-actions .btn { min-height: var(--h-control); }
   .table-stack td.row-actions > form .btn { width: 100%; }
-  .table-stack td.row-actions > .btn-ghost { flex: none; }
+  .table-stack td.row-actions > a.btn { flex: none; }
   .table-stack td.row-actions:not(:has(*)) { display: none; }
   .table-stack .stack-label { display: inline; }
   /* Members: the plan switch is the page's action, so it sits on line 1. */

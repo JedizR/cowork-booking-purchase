@@ -28,7 +28,7 @@
               <td class="row-actions">
                 {% if not s.archived_at %}
                   <a class="btn btn-secondary btn-utility" href="/operator/spaces?edit={{ s.id }}#space-form">Edit</a>
-                  <a class="btn btn-ghost btn-utility" href="/operator/spaces/{{ s.id }}/archive">Archive…</a>
+                  <a class="btn btn-secondary btn-utility" href="/operator/spaces/{{ s.id }}/archive">Archive…</a>
                 {% endif %}
               </td>
             </tr>
@@ -49,7 +49,7 @@
             <div class="field"><label for="hourly_rate">THB per hour</label><input id="hourly_rate" type="number" name="hourly_rate" value="{{ editing.hourly_rate_satang // 100 }}" min="0" max="10000" inputmode="numeric"></div>
           </div>
           <p class="help">Existing bookings keep their price and party size; issued e-tickets keep the old name.</p>
-          <div class="form-actions"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-ghost" href="/operator/spaces">Cancel</a></div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-secondary" href="/operator/spaces">Cancel</a></div>
         </form>
       {% else %}
         <div class="card-header"><h2 class="card-title">Create a space</h2></div>
