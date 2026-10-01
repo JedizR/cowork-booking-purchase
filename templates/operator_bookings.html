@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}All bookings{% endblock %}
+{% block content %}
+  <h1>All bookings</h1>
+  <form method="post" action="/operator/bookings/reconcile"><input type="hidden" name="return_to" value="bookings"><button type="submit">Reconcile all held</button></form>
+  {% if not rows %}<p>No bookings yet</p>{% endif %}
+  <table>
+    <tr><th>Reference</th><th>Member</th><th>Space</th><th>Time</th><th>Status</th><th>Coverage</th><th>Price</th><th>Flags</th><th>Actions</th></tr>
+    {% for b in rows %}
+      <tr data-booking-reference="{{ b.reference }}" data-flags="{{ b.flags|join(' ') }}">
+        <td><a href="/bookings/{{ b.reference }}">{{ b.reference }}</a></td>
+        <td>{{ b.member_name }} ({{ b.member_email }})</td>
+        <td>{{ b.space_name }}</td>
+        <td>{{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</td>
+        <td>
+          {% if b.status == "held" %}
+            {% if now >= b.hold_expires_at %}held, hold ended {{ b.hold_expires_at|hhmm }} (Reconcile)
+            {% elif not b.payment_session_id %}held, payment not started
+            {% else %}held, pay by {{ (b.hold_expires_at - pay_margin)|hhmm }}{% endif %}
+          {% elif b.status == "confirmed" and now >= b.end_at %}Completed
+          {% else %}{{ b.status }}{% endif %}
+          {% if b.cancelled_at %}<br>Cancelled {{ b.cancelled_at|local_time }}{% endif %}
+        </td>
+        <td>{{ b.coverage }}</td>
+        <td>{{ b.agreed_price_satang|money }}</td>
+        <td>
+          {% for f in b.flags %}{{ {"being_prepared": "Being prepared", "revocation_pending": "Revocation pending", "refund_pending": "Refund pending", "refund_failed": "Refund failed"}[f] }}{% if not loop.last %}, {% endif %}{% endfor %}
+          {% if b.refund_requested_at and b.refund_status in ("pending", "failed") %}<br>Refund requested {{ b.refund_requested_at|local_time }}{% endif %}
+        </td>
+        <td>
+          {% if b.status == "held" or (b.status == "confirmed" and now < b.end_at) %}<a href="/bookings/{{ b.reference }}/cancel">Cancel</a>{% endif %}
+          {% if b.flags %}<form method="post" action="/operator/bookings/{{ b.reference }}/retry"><input type="hidden" name="return_to" value="bookings"><button type="submit">Retry</button></form>{% endif %}
+          {% if b.status == "held" %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile"><input type="hidden" name="return_to" value="bookings"><button type="submit">Reconcile</button></form>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

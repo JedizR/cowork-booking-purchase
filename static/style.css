@@ -161,3 +161,52 @@ button:hover {
   height: 1em;
   min-width: 2px;
 }
+/* Start-block grid, tables, links styled as buttons. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.grid label {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+}
+
+.grid .greyed {
+  color: var(--muted);
+  background: #f4f4f4;
+}
+
+.booking-form label {
+  display: block;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+select {
+  font: inherit;
+  padding: 0.35rem;
+}
+
+a.button {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--busy);
+  border-radius: 4px;
+  color: var(--busy);
+  text-decoration: none;
+}

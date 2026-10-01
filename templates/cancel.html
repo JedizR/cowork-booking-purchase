@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Cancel {{ b.reference }}{% endblock %}
+{% block content %}
+  <h1>Cancel {{ b.reference }}, {{ b.space_name }} {{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</h1>
+  {% if by_operator %}<p>{{ b.member_name }} ({{ b.member_email }})</p>{% endif %}
+  <p>{{ text }}</p>
+  <form method="post" action="{% if by_operator %}/operator{% endif %}/bookings/{{ b.reference }}/cancel">
+    <input type="hidden" name="shown_refund_satang" value="{{ shown }}">
+    {% if by_operator and return_to %}<input type="hidden" name="return_to" value="booking">{% endif %}
+    <button type="submit">Cancel booking</button>
+    <a href="/bookings/{{ b.reference }}">Keep booking</a>
+  </form>
+{% endblock %}
