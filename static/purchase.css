@@ -313,27 +313,22 @@
 .cell-plan .cell-sub { margin-top: 2px; }
 .not-found { margin-top: var(--sp-6); }
 .dash .bar-row { grid-template-columns: minmax(84px, 120px) minmax(0, 1fr) 4.5em; }
-/* Dashboard: the work first (needs attention, coming up), then the last 7 days. */
+/* Dashboard: work that needs a person (only when there is some), today and coming up, then the last 7 days. */
+.attention-alert { margin-bottom: var(--sp-5); border: 1.5px solid var(--ink); }
+.attention-alert .alert-icon { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
 .dash-now { align-items: start; margin-bottom: var(--sp-7); }
-.attention-card.is-attention { border: 1.5px solid var(--ink); }
-.attention-list { list-style: none; margin: 0; padding: 0; }
-.attention-list li + li { border-top: 1px solid var(--divider-soft); }
-.attention-list a { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); min-height: 48px; padding: var(--sp-2) 0; text-decoration: none; font-size: var(--fs-callout); }
-.attention-list a:hover .attention-label { text-decoration: underline; }
-.attention-count { font-size: var(--fs-tagline); font-weight: 600; }
-.attention-count::after { content: "\203A"; margin-left: var(--sp-3); color: var(--muted); font-weight: 400; }
-.all-clear { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
-.all-clear .caption { margin: 2px 0 0; }
+.dash-empty { margin: 0; font-size: var(--fs-callout); color: var(--muted); }
+.stat-empty { margin-top: var(--sp-2); font-size: var(--fs-callout); color: var(--muted); line-height: 1.4; }
 .agenda { list-style: none; margin: 0; padding: 0; }
 .agenda-day { padding: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-fine); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .agenda-day:first-child { padding-top: 0; }
 .agenda-row a { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--divider-soft); text-decoration: none; }
 .agenda-row a:hover strong { text-decoration: underline; }
-.agenda-time { font-size: var(--fs-callout); font-weight: 600; }
+.agenda-row a > .num { font-size: var(--fs-callout); font-weight: 600; }
 .agenda-what { min-width: 0; font-size: var(--fs-callout); }
 .agenda-what strong, .agenda-what .cell-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-period { margin-bottom: var(--sp-4); }
-.dash-period .caption { margin: 0; }
+.dash-period .caption { margin-top: 0; margin-bottom: 0; }
 @media (max-width: 640px) {
   .toolbar-search { flex: 1 1 100%; }
   .toolbar .segmented { max-width: 100%; }

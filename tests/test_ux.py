@@ -180,3 +180,14 @@ def test_times_read_one_way_on_the_cancel_screen_and_the_booking_page(app, pay):
     a.post(f"/api/bookings/{ref}/cancel", json={})
     assert "Mon 5 Oct, 11:30" in words(op.get("/operator/bookings?when=any").get_data(as_text=True))
 
+
+def test_pur_r34_dashboard_leads_with_today_and_coming_up(app):
+    op, a = member(app, "operator@example.com", "Op"), member(app)
+    html = words(op.get("/dashboard").get_data(as_text=True))
+    assert "No bookings today." in html and "Nothing booked after today yet." in html
+    assert "No booking started in these 7 days" in html  # a line in the tile, not a bare 0
+    now = book_json(a, space_id=4, start="2026-10-05T12:00:00+07:00", blocks=2, party_size=1).get_json()["reference"]
+    later = book_json(a, space_id=4, start="2026-10-07T09:00:00+07:00", party_size=1).get_json()["reference"]
+    html = op.get("/dashboard").get_data(as_text=True)
+    today_card, coming_card = html.split(">Coming up<")
+    assert now in today_card and later not in today_card and later in coming_card

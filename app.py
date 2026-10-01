@@ -1214,13 +1214,18 @@ def create_app(database_url: str | None = None) -> Flask:
         spaces = app.db.execute("SELECT count(*) AS n FROM spaces WHERE archived_at IS NULL").fetchone()["n"]
         booked = sum(hours.values())
         utilization = booked / (12 * spaces * 7) if spaces else 0.0
-        # The work view: what needs a person now and who comes in next. Counts and times only, no money (PUR-R34).
-        coming = app.db.execute(BOOKING_SQL + " WHERE b.status IN ('held', 'confirmed') AND b.end_at > %s "
-                                "ORDER BY b.start_at LIMIT 8", (now,)).fetchall()
+        # The work view first: today's slot-blocking bookings (ended ones too, the day's schedule) and the next ones
+        # after today. Counts and times only, no money (PUR-R34).
+        day0 = datetime.combine(today(now), time(0), BKK)
+        live = (BOOKING_SQL + " WHERE " + BLOCKING + " AND b.start_at >= %(lo)s AND b.start_at < %(hi)s "
+                "ORDER BY b.start_at")
+        on_today = app.db.execute(live, {"now": now, "lo": day0, "hi": day0 + timedelta(days=1)}).fetchall()
+        coming = app.db.execute(live + " LIMIT 6", {"now": now, "lo": day0 + timedelta(days=1),
+                                                    "hi": day0 + timedelta(days=32)}).fetchall()
         return render_template(
             "dashboard.html", status={k: status.get(k, 0) for k in ("held", "confirmed", "expired", "cancelled")},
             hours={k: hours_text(hours.get(k, 0)) for k in ("pay", "plan", "free")}, members=members,
             utilization=utilization, period_from=lo.date(), period_to=today(now), spaces=spaces, coming=coming,
-            now=now)
+            on_today=on_today, now=now)
 
     return app
