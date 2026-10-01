@@ -1,11 +1,15 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Cancel {{ b.reference }}{% endblock %}
+{% block subnav %}{% if operator_view %}{{ ui.operator_nav("bookings") }}{% endif %}{% endblock %}
 {% block width %} container-form{% endblock %}
 {% block content %}
   <a class="back-link" href="/bookings/{{ b.reference }}">Back to booking</a>
   <section class="card confirm-card">
     <p class="eyebrow">Cancel booking</p>
+    {# The title is the PUR-R30 sentence word for word; the line under it says the same time the way every page does. #}
     <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }} <span class="nowrap">{{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</span></h1>
+    <p class="confirm-when">{{ b.start_at|fdate("long") }} · <span class="num nowrap">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span> · {{ b.blocks|duration }}</p>
     {% if by_operator %}<p class="confirm-member">{{ b.member_name }} ({{ b.member_email }})</p>{% endif %}
 
     <div class="summary confirm-summary">
