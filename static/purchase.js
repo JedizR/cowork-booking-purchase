@@ -201,6 +201,8 @@
         : picking ? "Now tap an end time, or keep " + dur(end - start + 1) : "");
       hint.hidden = !hint.textContent;
       hint.classList.toggle("is-info", !!note);
+      // Whatever gets focus or is scrolled to stops above the bar, however tall the bar has grown.
+      document.documentElement.style.scrollPaddingBottom = bar.offsetHeight + 16 + "px";
       // The end handle sits on the bottom edge of the range: drag it to resize (touch included).
       handle.hidden = start === null || picking || pv !== null;
       if (!handle.hidden) handle.style.top = (slots[end].offsetTop + slots[end].offsetHeight) + "px";
