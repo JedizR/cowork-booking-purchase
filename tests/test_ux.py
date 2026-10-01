@@ -216,3 +216,15 @@ def test_pur_r34_dashboard_leads_with_today_and_coming_up(app):
     html = op.get("/dashboard").get_data(as_text=True)
     today_card, coming_card = html.split(">Coming up<")
     assert now in today_card and later not in today_card and later in coming_card
+
+
+def test_a_cancelled_paid_booking_offers_book_again(app, pay):
+    a = member(app)
+    ref = book_json(a).get_json()["reference"]
+    pay.pay(ref)
+    a.post(f"/api/bookings/{ref}/cancel", json={})  # paid, refunded in full
+    page = a.get(f"/bookings/{ref}").get_data(as_text=True)
+    assert '<a class="btn btn-primary" href="/spaces/1?date=2026-10-07&amp;blocks=3">Book again</a>' in page
+    assert ">Book again</a>" in a.get("/bookings/mine?view=past").get_data(as_text=True)
+    op = member(app, "operator@example.com", "Op")
+    assert ">Book again</a>" not in op.get(f"/bookings/{ref}").get_data(as_text=True)  # not the operator's booking

@@ -907,8 +907,6 @@ def create_app(database_url: str | None = None) -> Flask:
                                book_again=book_again_url(b, now), full_refund_by=b["start_at"] - timedelta(hours=24))
 
     def book_again_url(b, now) -> str:
-        if b["space_archived_at"]:
-            return "/"
         day = b["start_at"].astimezone(BKK).date()
         if date_in_horizon(day, now):
             return f"/spaces/{b['space_id']}?" + urlencode({"date": day.isoformat(), "blocks": b["blocks"]})

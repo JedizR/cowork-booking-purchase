@@ -152,7 +152,7 @@
           {% endif %}
           {% if b.grant_status == "revoke_pending" %}<div class="status-line status-line-action"><span class="status-dot" aria-hidden="true">i</span><div class="status-text">Your ticket is still being cancelled; any refund follows.</div>{{ retry() }}</div>{% endif %}
           {% set ticket = b.status == "cancelled" and b.grant_status == "revoked" and b.ticket_url %}
-          {% set again = own and (b.status == "expired" or (b.status == "cancelled" and b.payment_status == "unpaid")) %}
+          {% set again = own and not b.space_archived_at %}
           {% set fix = op and b.refund_amount_satang and b.refund_status == "failed" and b.grant_status != "revoke_pending" %}
           {% if ticket or again or fix %}
             <div class="card-footer">

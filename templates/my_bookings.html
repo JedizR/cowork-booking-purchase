@@ -63,6 +63,7 @@
                 {% if not b.space_archived_at %}<a class="btn" href="/spaces/{{ b.space_id }}?blocks={{ b.blocks }}">Book again</a>{% endif %}
               {% else %}
                 {{ ui.status_badge(b, now) }}
+                {% if not b.space_archived_at %}<a class="btn" href="/spaces/{{ b.space_id }}?blocks={{ b.blocks }}">Book again</a>{% endif %}
               {% endif %}
             </div>
           </li>
