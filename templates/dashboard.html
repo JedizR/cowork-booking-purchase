@@ -1,15 +1,130 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Dashboard{% endblock %}
+{% block subnav %}{{ ui.operator_nav("dashboard") }}{% endblock %}
+{% macro agenda_row(b, today=False) %}
+  <li class="agenda-row">
+    <a href="/bookings/{{ b.reference }}">
+      {{ ui.times(b) }}
+      <span class="agenda-what"><strong>{{ b.space_name }}</strong><span class="cell-sub">{{ b.member_name }} · {{ b.reference }}</span></span>
+      {% if b.status == "held" %}<span class="badge badge-outline">Held</span>
+      {% elif today and now >= b.end_at %}<span class="badge badge-muted">Done</span>
+      {% elif now >= b.start_at %}<span class="badge badge-solid">Now</span>{% endif %}
+    </a>
+  </li>
+{% endmacro %}
 {% block content %}
-  <h1>Dashboard</h1>
-  <p class="hint">Last 7 Bangkok days, {{ period_from }} to {{ period_to }}. Money totals are on Payment's operator page.</p>
-  <ul class="cards" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
-      {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
-      {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
-    <li>Utilization<br><strong>{{ '%.1f' % (utilization * 100) }}%</strong></li>
-    <li>Members<br><strong>{{ members }}</strong></li>
-    {% for k, v in status.items() %}<li>{{ k|capitalize }}<br><strong>{{ v }}</strong></li>{% endfor %}
-    {% for k, v in hours.items() %}<li>Confirmed hours, {{ k }}<br><strong>{{ v }}</strong></li>{% endfor %}
-  </ul>
-  <form method="post" action="/operator/bookings/reconcile"><input type="hidden" name="return_to" value="dashboard"><button type="submit">Reconcile all held</button></form>
+  {% set total = status.values()|sum %}
+  {% set hours_total = hours.values()|map("float")|sum %}
+  {% set a = attention %}
+  {% set need = a.flagged + a.lapsed %}
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle meta"><span>{{ now|fdate("long") }}</span><span class="num">{{ now|hhmm }} in Bangkok</span>{% if not need %}<span>Nothing needs you right now</span>{% endif %}</p>
+    </div>
+    {% if a.held %}
+      <form method="post" action="/operator/bookings/reconcile" class="page-actions"><input type="hidden" name="return_to" value="dashboard"><button class="btn btn-secondary" type="submit">Reconcile all held <span class="btn-count">{{ a.held }}</span></button></form>
+    {% endif %}
+  </header>
+
+  {# Work that needs a person comes first, only when there is some (PUR-R32, PUR-R33). Counts only (PUR-R34). #}
+  {% if need %}
+    <div class="alert attention-alert" role="status">
+      <span class="alert-icon" aria-hidden="true">!</span>
+      <p class="alert-title">{{ need }} {{ "booking needs" if need == 1 else "bookings need" }} a person</p>
+      <p class="alert-body meta">
+        {% for key, label in (("refund_failed", "Refund failed"), ("refund_pending", "Refund pending"), ("revocation_pending", "Revocation pending"), ("being_prepared", "E-ticket being prepared"), ("lapsed", "Hold ended, not reconciled")) %}
+          {% if a[key] %}<span>{{ label }} <strong class="num">{{ a[key] }}</strong></span>{% endif %}
+        {% endfor %}
+      </p>
+      <div class="alert-actions"><a class="btn btn-primary" href="{{ '/operator/bookings?status=flagged' if a.flagged else '/operator/bookings?status=held&when=any' }}">Review</a></div>
+    </div>
+  {% endif %}
+
+  {# Today and the next bookings lead, so the first screen is the day, never a wall of zeros. #}
+  <div class="grid-2 dash-now{% if not on_today %} is-quiet{% endif %}">
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Today</h2><span class="card-meta">{% if on_today %}{{ on_today|length }} {{ "booking" if on_today|length == 1 else "bookings" }}{% else %}{{ now|fdate }}{% endif %}</span></div>
+      {% if on_today %}
+        <ul class="agenda">{% for b in on_today %}{{ agenda_row(b, today=True) }}{% endfor %}</ul>
+      {% else %}
+        <p class="dash-empty">No bookings today.{% if coming %} Next: {{ coming[0].space_name }}, <span class="nowrap">{{ coming[0].start_at|at }}</span>.{% endif %}</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Coming up</h2><a class="btn btn-utility" href="/operator/bookings">All bookings</a></div>
+      {% if coming %}
+        <ul class="agenda">
+          {% for b in coming %}
+            {% set day = ui.day_word(b.start_at, now) %}
+            {% if loop.first or day != ui.day_word(loop.previtem.start_at, now) %}<li class="agenda-day">{{ day }}</li>{% endif %}
+            {{ agenda_row(b) }}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="dash-empty">Nothing booked after today yet. Bookings show here as members make them.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {# D24: the last 7 Bangkok days, bookings counted by their start date. #}
+  <div class="section-header dash-period">
+    <h2 class="section-title">Last 7 days</h2>
+    <p class="caption muted meta"><span class="nowrap">{{ period_from|fdate }} to {{ period_to|fdate }}</span><span>by start date, Bangkok</span></p>
+  </div>
+  <div class="dash" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
+       {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
+       {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
+    <div class="grid-4">
+      {# Every tile shows its figure, 0 included (PUR-R34: utilization "0.0%"); the line under it says why. #}
+      {% set pct = '%.1f' % (utilization * 100) %}
+      <div class="stat">
+        <span class="stat-label">Bookings started</span>
+        <span class="stat-value">{{ total }}</span>
+        {% if total %}<span class="stat-meta num meta">{% for k in ("confirmed", "held", "expired", "cancelled") %}<span class="nowrap">{{ status[k] }} {{ k }}</span>{% endfor %}</span>
+        {% else %}<span class="stat-meta">No booking started in these 7 days</span>{% endif %}
+      </div>
+      <div class="stat">
+        <span class="stat-label">Utilization</span>
+        <span class="stat-value">{{ pct }}<small>%</small></span>
+        <progress class="progress" max="100" value="{{ pct }}">{{ pct }}%</progress>
+        <span class="stat-meta num">{% if hours_total %}confirmed hours of {{ spaces }} {{ "room" if spaces == 1 else "rooms" }} × 12 h × 7 days{% else %}No confirmed hours yet{% endif %}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Members who booked</span>
+        <span class="stat-value">{{ members }}</span>
+        <span class="stat-meta">{{ "with a confirmed booking" if members else "No confirmed booking yet" }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Confirmed hours</span>
+        <span class="stat-value">{{ hours_total|hours }}<small> h</small></span>
+        <span class="stat-meta">{{ "pay, plan and free" if hours_total else "No confirmed hours yet" }}</span>
+      </div>
+    </div>
+    {% if total %}
+      <div class="grid-2 dash-charts">
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">Bookings by status</h2><span class="card-meta num">{{ total }} total</span></div>
+          <ul class="bar-chart">
+            {% for k in ("confirmed", "held", "expired", "cancelled") %}
+              <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track">{% if status[k] %}<span class="bar{% if k in ('expired', 'cancelled') %} bar-muted{% endif %}" style="--value: {{ status[k] / total * 100 }}%"></span>{% endif %}</span><span class="bar-value">{{ status[k] }}</span></li>
+            {% endfor %}
+          </ul>
+        </section>
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">Confirmed hours by coverage</h2><span class="card-meta num">{{ hours_total|hours }} h</span></div>
+          {% if hours_total %}
+            <ul class="bar-chart">
+              {% for k in ("pay", "plan", "free") %}
+                <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track">{% if hours[k]|float %}<span class="bar" style="--value: {{ hours[k]|float / hours_total * 100 }}%"></span>{% endif %}</span><span class="bar-value">{{ hours[k] }} h</span></li>
+              {% endfor %}
+            </ul>
+          {% else %}<p class="dash-empty">No confirmed hours yet.</p>{% endif %}
+          <p class="fine dash-fine">Plan and free hours are not revenue. Money totals are on <a href="{{ payment_public_url }}/operator">Payments</a>.</p>
+        </section>
+      </div>
+    {% endif %}
+  </div>
 {% endblock %}

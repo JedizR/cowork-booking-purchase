@@ -1,13 +1,33 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Cancel {{ b.reference }}{% endblock %}
+{% block subnav %}{% if operator_view %}{{ ui.operator_nav("bookings") }}{% endif %}{% endblock %}
+{% block width %} container-form{% endblock %}
 {% block content %}
-  <h1>Cancel {{ b.reference }}, {{ b.space_name }} {{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</h1>
-  {% if by_operator %}<p>{{ b.member_name }} ({{ b.member_email }})</p>{% endif %}
-  <p>{{ text }}</p>
-  <form method="post" action="{% if by_operator %}/operator{% endif %}/bookings/{{ b.reference }}/cancel">
-    <input type="hidden" name="shown_refund_satang" value="{{ shown }}">
-    {% if by_operator and return_to %}<input type="hidden" name="return_to" value="booking">{% endif %}
-    <button type="submit">Cancel booking</button>
-    <a href="/bookings/{{ b.reference }}">Keep booking</a>
-  </form>
+  <a class="back-link" href="/bookings/{{ b.reference }}">Back to booking</a>
+  <section class="card confirm-card">
+    <p class="eyebrow">Cancel booking</p>
+    {# The PUR-R30 title names the booking, with the time the way every page says it. #}
+    <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }}, <span class="nowrap">{{ ui.when(b) }}</span></h1>
+    <p class="meta confirm-when"><span>{{ b.blocks|duration }}</span><span>Party of {{ b.party_size }}</span>{% if by_operator %}<span>{{ b.member_name }} ({{ b.member_email }})</span>{% endif %}</p>
+
+    <div class="summary confirm-summary">
+      <h2 class="summary-title">What happens</h2>
+      <p class="confirm-refund{% if text|length > 40 %} is-long{% endif %}">{{ text }}</p>
+      <ul class="consequences">
+        {% if b.status == "confirmed" %}<li>The e-ticket is cancelled and stops opening the door.</li>{% endif %}
+        {% if b.status == "held" %}<li>The held time is released for others to book.</li>{% endif %}
+        <li>Cancelling cannot be undone. To use the room later, book again.</li>
+      </ul>
+    </div>
+
+    <form method="post" action="{% if by_operator %}/operator{% endif %}/bookings/{{ b.reference }}/cancel">
+      <input type="hidden" name="shown_refund_satang" value="{{ shown }}">
+      {% if by_operator and return_to %}<input type="hidden" name="return_to" value="booking">{% endif %}
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Cancel booking</button>
+        <a class="btn btn-secondary" href="/bookings/{{ b.reference }}">Keep booking</a>
+      </div>
+    </form>
+  </section>
 {% endblock %}

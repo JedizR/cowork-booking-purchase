@@ -33,3 +33,8 @@ def create_grant(booking_reference, member_ref, space_id, space_name, valid_from
 
 def revoke_grant(booking_reference: str) -> dict:
     return _call("POST", f"/grants/{booking_reference}/revoke", ref=booking_reference)
+
+
+def get_grant(booking_reference: str) -> dict:
+    """PUR-R41: read the ticket code live on each booking page view; Purchase never stores it."""
+    return _call("GET", f"/grants/{booking_reference}", ref=booking_reference)

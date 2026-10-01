@@ -1,0 +1,101 @@
+{# Shared bits. Flashes are the one-time outcome of the last form (PUR-R36); their look is read from the text. #}
+{% macro flashes() %}
+  {% set messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="flashes">
+      {% for m in messages %}{% set kind = m|flash_kind %}
+        <li class="flash{% if kind != 'info' %} flash-{{ kind }}{% endif %}" role="{{ 'alert' if kind == 'error' else 'status' }}"><span class="flash-icon" aria-hidden="true"></span><span>{{ m }}</span></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{# Booking status as fill plus words (DESIGN status map, PUR-R28). Completed is derived from the end. #}
+{% macro status_badge(b, now, unknown=False) %}
+  {%- if b.status == "confirmed" and now >= b.end_at -%}<span class="badge badge-muted">Completed</span>
+  {%- elif b.status == "confirmed" -%}<span class="badge badge-solid">Confirmed</span>
+  {%- elif b.status == "held" and unknown -%}<span class="badge badge-attention">Payment status unknown</span>
+  {%- elif b.status == "held" -%}<span class="badge badge-outline">Held</span>
+  {%- elif b.status == "cancelled" and b.refund_status == "failed" -%}<span class="badge badge-attention">Refund failed</span>
+  {%- else -%}<span class="badge badge-muted">{{ b.status|capitalize }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro empty(title, text, icon="calendar") %}
+  <div class="empty">
+    <div class="empty-icon" aria-hidden="true">{{ glyph(icon) }}</div>
+    <h2 class="empty-title">{{ title }}</h2>
+    {% if text %}<p class="empty-text">{{ text }}</p>{% endif %}
+    {{ caller() if caller }}
+  </div>
+{% endmacro %}
+
+{% macro glyph(name) -%}
+  {%- if name == "calendar" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+  {%- elif name == "room" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5V20M2.5 20h19M16 9h3.5v11M12.5 12.5v1"/></svg>
+  {%- elif name == "search" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+  {%- elif name == "check" -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+  {%- endif -%}
+{%- endmacro %}
+
+{# The operator section's tabs (PUR-R06): the same five short labels as Payment's operator page, so the
+   section reads as one place; the script scrolls the current tab into view on a phone. #}
+{% macro operator_nav(active) %}
+  <div class="subnav">
+    <div class="subnav-inner">
+      <span class="subnav-title">Operator</span>
+      <nav class="tabs" aria-label="Operator">
+        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "Bookings"), ("/operator/spaces", "spaces", "Spaces"), ("/operator/members", "members", "Members")] %}
+          <a href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>{{ label }}{% if key == "bookings" and attention and attention.flagged %} <span class="tab-count" title="Bookings that need a person">{{ attention.flagged }}</span>{% endif %}</a>
+        {% endfor %}
+        <a href="{{ payment_public_url }}/operator">Payments <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </div>
+{% endmacro %}
+
+{# The live-hold banner of the space page and My bookings (PUR-R39, PUR-R40). The title is the rule's sentence;
+   the actions are the two ways out: pay (only before the payment deadline) or cancel. #}
+{% macro hold_banner(hold, hold_text, seconds_left) %}
+  {% set open = not hold_text.startswith("Time to pay") %}
+  <div class="alert alert-strong hold-banner" role="status">
+    <span class="alert-icon" aria-hidden="true">!</span>
+    <p class="alert-title">{% if not open %}{{ hold_text }}{% else %}You have a held booking <a href="/bookings/{{ hold.reference }}" class="nowrap">{{ hold.reference }}</a>, {{ hold.space_name }}, {{ when(hold) }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}.</p>
+    <p class="alert-body">{% if open %}{{ "Less than 1 min" if seconds_left < 60 else ((seconds_left + 59) // 60) ~ " min" }} left to pay. {% endif %}<span class="hold-why">One held booking at a time: pay for it or cancel it to book another time.</span></p>
+    <div class="alert-actions">
+      {% if open %}
+        <form method="post" action="/spaces/{{ hold.space_id }}/book" class="inline">
+          <input type="hidden" name="date" value="{{ (hold.start_at|local_time)[:10] }}">
+          <input type="hidden" name="start" value="{{ hold.start_at|hhmm }}">
+          <input type="hidden" name="blocks" value="{{ hold.blocks }}">
+          <input type="hidden" name="party_size" value="{{ hold.party_size }}">
+          <input type="hidden" name="note" value="{{ hold.note or '' }}">
+          <button class="btn btn-primary" type="submit">Continue to payment</button>
+        </form>
+      {% endif %}
+      <a class="btn btn-secondary" href="/bookings/{{ hold.reference }}/cancel">Cancel hold</a>
+    </div>
+  </div>
+{% endmacro %}
+
+{# One date-and-time form everywhere: "Sat 3 Oct · 14:00–15:00" (DESIGN principle 5), the range never split. #}
+{% macro when(b, day=True) %}{% if day %}<span class="nowrap">{{ b.start_at|fdate }}</span> · {% endif %}{{ times(b) }}{% endmacro %}
+{% macro times(b) %}<span class="num nowrap">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span>{% endmacro %}
+
+{# "Today", "Tomorrow" or "Sat 3 Oct", against now. #}
+{% macro day_word(t, now) %}{% set d = t|fdate("full") %}{% if d == now|fdate("full") %}Today{% elif d == (now + one_day)|fdate("full") %}Tomorrow{% else %}{{ t|fdate }}{% endif %}{% endmacro %}
+
+{# The money state of a booking from stored fields (PUR-R19, PUR-R32, PUR-R34): plan and free are never revenue. #}
+{% macro money_state(b) -%}
+  {%- if b.coverage == "plan" -%}Plan · no charge
+  {%- elif b.coverage == "free" -%}Free
+  {%- elif b.status == "held" -%}Not paid
+  {%- elif b.status == "expired" -%}{{ "Paid after the hold" if b.payment_status == "paid" else "Not paid" }}
+  {%- elif b.status == "confirmed" -%}Paid
+  {%- elif b.payment_status != "paid" -%}Not paid
+  {%- elif b.refund_status == "succeeded" -%}Refunded
+  {%- elif b.refund_status == "pending" -%}Refund pending
+  {%- elif b.refund_status == "failed" -%}Refund failed
+  {%- elif b.refund_amount_satang == 0 -%}No refund (under 24 h)
+  {%- else -%}Paid{%- endif -%}
+{%- endmacro %}

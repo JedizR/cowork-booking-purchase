@@ -3,11 +3,11 @@ import logging
 import os
 import re
 import unicodedata
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from urllib.parse import urlencode
 
 import psycopg
-from flask import (Flask, abort, current_app, flash, g, jsonify, redirect, render_template, request,
+from flask import (Flask, Response, abort, current_app, flash, g, jsonify, redirect, render_template, request,
                    session)
 from psycopg.errors import ExclusionViolation, UniqueViolation
 from psycopg.rows import dict_row
@@ -17,9 +17,9 @@ import access_client
 import clock
 import payment_client
 from payment_client import CallFailed
-from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, grid, hours_text,
-                      money, new_reference, price_satang, refund_policy, shape_error, today,
-                      window_error)
+from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, fat, fdate, fwhen, grid,
+                      hours_text, money, month, new_reference, price_satang, refund_policy, shape_error,
+                      today, window_error)
 
 log = logging.getLogger(__name__)
 SESSION_HOURS = 12
@@ -88,6 +88,26 @@ FROM bookings b JOIN spaces s ON s.id = b.space_id JOIN members m ON m.id = b.me
 """
 # Slot-blocking (D11): confirmed, or held with the hold still running at :now.
 BLOCKING = "(b.status = 'confirmed' OR (b.status = 'held' AND b.hold_expires_at > %(now)s))"
+# The operator's attention states (PUR-R32, PUR-R33): one count per flag, plus lapsed holds to reconcile.
+ATTENTION_SQL = """
+SELECT count(*) FILTER (WHERE refund_status = 'failed') AS refund_failed,
+       count(*) FILTER (WHERE refund_status = 'pending') AS refund_pending,
+       count(*) FILTER (WHERE grant_status = 'revoke_pending') AS revocation_pending,
+       count(*) FILTER (WHERE status = 'confirmed' AND grant_status = 'pending') AS being_prepared,
+       count(*) FILTER (WHERE status = 'held' AND hold_expires_at <= %(now)s) AS lapsed,
+       count(*) FILTER (WHERE status = 'held') AS held,
+       count(*) FILTER (WHERE refund_status IN ('pending', 'failed') OR grant_status = 'revoke_pending'
+                        OR (status = 'confirmed' AND grant_status = 'pending')) AS flagged
+FROM bookings
+"""
+
+
+def flags_of(b) -> list[str]:
+    """The All bookings flags, worst first (PUR-R32, PUR-R33); the same predicates as ATTENTION_SQL."""
+    return [f for f, on in (("refund_failed", b["refund_status"] == "failed"),
+                            ("refund_pending", b["refund_status"] == "pending"),
+                            ("revocation_pending", b["grant_status"] == "revoke_pending"),
+                            ("being_prepared", b["status"] == "confirmed" and b["grant_status"] == "pending")) if on]
 
 
 class Refusal(Exception):
@@ -314,7 +334,7 @@ def start_session(b) -> str:
     try:
         s = payment_client.create_session(
             b["reference"], b["agreed_price_satang"],
-            f"{b['space_name']}, {local_time(b['start_at'])}-{hhmm(b['end_at'])}",
+            f"{b['space_name']} · {fwhen(b['start_at'], b['end_at'])}",  # space and Bangkok time only, PUR-R23
             f"{public}/bookings/{b['reference']}/return", f"{public}/bookings/{b['reference']}", deadline(b).astimezone(BKK))
     except CallFailed:
         raise Refusal(503, "payment_unreachable", "Payment is not reachable. Please try again.",
@@ -528,6 +548,22 @@ def valid_email(email: str) -> bool:
             and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None)
 
 
+SUCCESS_FLASHES = ("Registered.", "Logged out", "Booking cancelled", "Space saved", "Space archived",
+                   "E-ticket issued", "Grant revoked", "Plan on ", "Plan off ")
+INFO_FLASHES = ("Please log in", "Log in to book", "You already booked", "This booking is already cancelled",
+                "Nothing to retry")
+
+
+def flash_kind(message: str) -> str:
+    """Display style of a flash (PUR-R36): success, info or error. Only the look depends on it."""
+    # ponytail: go() flashes plain strings, so the look is read from the text; flash categories if this grows.
+    if message.startswith(SUCCESS_FLASHES) or re.fullmatch(r"Refund attempt \d+ succeeded", message):
+        return "success"
+    if message.startswith(INFO_FLASHES) or re.match(r"\d+ confirmed, ", message):
+        return "info"
+    return "error"
+
+
 def safe_next(path) -> str:
     if (isinstance(path, str) and path.startswith("/") and path[1:2] not in ("/", "\\")
             and not any(ord(c) < 32 or ord(c) == 127 for c in path)):
@@ -552,6 +588,10 @@ def create_app(database_url: str | None = None) -> Flask:
     app.add_template_filter(hhmm, "hhmm")
     app.add_template_filter(money, "money")
     app.add_template_filter(duration_text, "duration")
+    app.add_template_filter(fdate, "fdate")
+    app.add_template_filter(fat, "at")
+    app.add_template_filter(hours_text, "hours")
+    app.add_template_filter(flash_kind, "flash_kind")
 
     @app.before_request
     def load_member():
@@ -572,8 +612,11 @@ def create_app(database_url: str | None = None) -> Flask:
 
     @app.context_processor
     def inject_current_user():
-        return {"me": g.get("member"), "payment_public_url": env("PAYMENT_PUBLIC_URL", "http://localhost:8002"),
-                "pay_margin": PAY_MARGIN, "one_day": timedelta(hours=24)}
+        me = g.get("member")
+        if me and me["is_operator"] and "attention" not in g:
+            g.attention = app.db.execute(ATTENTION_SQL, {"now": clock.now()}).fetchone()  # the nav count
+        return {"me": me, "payment_public_url": env("PAYMENT_PUBLIC_URL", "http://localhost:8002"),
+                "pay_margin": PAY_MARGIN, "one_day": timedelta(hours=24), "attention": g.get("attention")}
 
     def require_member(message: str = "Please log in", keep: str | None = None):
         if g.member:
@@ -653,15 +696,18 @@ def create_app(database_url: str | None = None) -> Flask:
 
     # --- accounts (PUR-R01 to PUR-R04, PUR-R37) ---
 
+    # The typed email (and display name) survive a refused or finished form in the signed session, like the flash;
+    # never the password, and never anything from the URL (PUR-R36).
     @app.get("/register")
     def register_form():
-        return render_template("register.html")
+        return render_template("register.html", typed=session.pop("typed", {}))
 
     @app.post("/register")
     def register():
         email = request.form.get("email", "").strip().lower()
         name = request.form.get("display_name", "").strip()
         password = request.form.get("password", "")
+        session["typed"] = {"email": email[:254], "display_name": name[:50]}
         if not valid_email(email):
             return go("/register", "Enter a valid email")
         if len(password) < 8:
@@ -676,18 +722,21 @@ def create_app(database_url: str | None = None) -> Flask:
                                                        email == os.getenv("OPERATOR_EMAIL", "").strip().lower()))
         except UniqueViolation:
             return go("/register", "Email already registered")
+        session["typed"] = {"email": email}
         return go("/login", "Registered. Please log in.")
 
     @app.get("/login")
     def login_form():
-        return render_template("login.html")
+        return render_template("login.html", typed=session.pop("typed", {}))
 
     @app.post("/login")
     def login():
         email = request.form.get("email", "").strip().lower()
         m = app.db.execute("SELECT * FROM members WHERE email = %s", (email,)).fetchone()
         if m is None or not check_password_hash(m["password_hash"], request.form.get("password", "")):
+            session["typed"] = {"email": email[:254]}
             return go("/login", "Invalid email or password")
+        session.pop("typed", None)
         if email == os.getenv("OPERATOR_EMAIL", "").strip().lower() and not m["is_operator"]:
             app.db.execute("UPDATE members SET is_operator = TRUE WHERE id = %s", (m["id"],))
         target = safe_next(session.pop("next", "/"))
@@ -703,14 +752,19 @@ def create_app(database_url: str | None = None) -> Flask:
 
     @app.get("/")
     def index():
+        now = clock.now()
         spaces = app.db.execute("SELECT * FROM spaces WHERE archived_at IS NULL ORDER BY id").fetchall()
-        return render_template("index.html", spaces=spaces)
+        for s in spaces:  # "Next free: Today 15:30", from the same grid the space page reads (PUR-R13)
+            busy = busy_ranges(s["id"], today(now), now, days=2)
+            s["next_free"] = next((r["start"] for d in range(2)
+                                   for r in grid(today(now) + timedelta(days=d), 1, now, busy) if r["available"]), None)
+        return render_template("index.html", spaces=spaces, now=now)
 
-    def busy_ranges(space_id, day: date, now):
+    def busy_ranges(space_id, day: date, now, days: int = 1):
         lo = datetime.combine(day, time(0), BKK)
         rows = app.db.execute("SELECT b.start_at, b.end_at FROM bookings b WHERE b.space_id = %(s)s "
                               "AND b.start_at < %(hi)s AND b.end_at > %(lo)s AND " + BLOCKING,
-                              {"s": space_id, "lo": lo, "hi": lo + timedelta(days=1), "now": now}).fetchall()
+                              {"s": space_id, "lo": lo, "hi": lo + timedelta(days=days), "now": now}).fetchall()
         return [(r["start_at"], r["end_at"]) for r in rows]
 
     @app.get("/spaces/<int:space_id>")
@@ -730,12 +784,27 @@ def create_app(database_url: str | None = None) -> Flask:
         me = g.member
         coverage = "free" if price == 0 else "plan" if me and me["plan_active"] else "pay"
         hold = own_hold(me["id"], now) if me else None
-        starts = grid(day, blocks, now, busy_ranges(space_id, day, now))
+        busy = busy_ranges(space_id, day, now)
+        min_day, max_day = today(now), today(now) + timedelta(days=30)
+        strip = [min_day + timedelta(days=i) for i in range(31)]
+        horizon = busy_ranges(space_id, min_day, now, days=31)  # one read marks the days with no free block
+        full = {d for d in strip if not any(r["available"] for r in grid(d, 1, now, horizon))}
+        slots = grid(day, 1, now, busy)  # the timeline: one row per 30-min block
+        if me:  # the Member's own slot-blocking bookings read "Booked · yours" (still booked for everyone)
+            lo = datetime.combine(day, time(0), BKK)
+            mine = app.db.execute("SELECT b.reference, b.start_at, b.end_at FROM bookings b WHERE b.member_id = %(m)s "
+                                  "AND b.space_id = %(s)s AND b.start_at < %(hi)s AND b.end_at > %(lo)s AND " + BLOCKING,
+                                  {"m": me["id"], "s": space_id, "lo": lo, "hi": lo + timedelta(days=1),
+                                   "now": now}).fetchall()
+            for s in slots:
+                s["mine"] = next((r["reference"] for r in mine if r["start_at"] < s["end"] and s["start"] < r["end_at"]),
+                                 None) if s["reason"] == "Booked" else None
         return render_template("space.html", space=space, day=day, blocks=blocks, price=price,
-                               coverage=coverage, starts=starts, hold=hold, now=now,
+                               coverage=coverage, starts=grid(day, blocks, now, busy), hold=hold, now=now,
+                               slots=slots, cal=month(day, now), strip=strip, full=full,
                                hold_text=held_message(hold, now) if hold else None,
-                               min_day=today(now), max_day=today(now) + timedelta(days=30),
-                               soon=day <= today(now) + timedelta(days=1))
+                               hold_left=int((deadline(hold) - now).total_seconds()) if hold else 0,
+                               min_day=min_day, max_day=max_day, soon=day <= today(now) + timedelta(days=1))
 
     @app.get("/api/spaces")
     def api_spaces():
@@ -823,15 +892,21 @@ def create_app(database_url: str | None = None) -> Flask:
         b = fetch_booking(ref)
         now = clock.now()
         own = b["member_id"] == g.member["id"]
-        return render_template("booking.html", b=b, now=now, own=own, unknown=unknown,
+        code = None  # PUR-R41: read live from Access on each view, never stored; False = Access gave no answer
+        if b["status"] == "confirmed" and b["grant_status"] == "issued":
+            try:
+                grant = access_client.get_grant(ref)
+                code = grant.get("ticket_code") if grant.get("status") in ("issued", "checked_in") else None
+            except CallFailed:
+                code = False
+        return render_template("booking.html", b=b, now=now, own=own, unknown=unknown, code=code,
+                               operator_view=not own,
                                deadline=deadline(b) if b["hold_expires_at"] else None,
                                seconds_left=int((deadline(b) - now).total_seconds())
-                               if b["hold_expires_at"] else 0,
+                               if b["hold_expires_at"] else 0, pay_window=int((HOLD - PAY_MARGIN).total_seconds()),
                                book_again=book_again_url(b, now), full_refund_by=b["start_at"] - timedelta(hours=24))
 
     def book_again_url(b, now) -> str:
-        if b["space_archived_at"]:
-            return "/"
         day = b["start_at"].astimezone(BKK).date()
         if date_in_horizon(day, now):
             return f"/spaces/{b['space_id']}?" + urlencode({"date": day.isoformat(), "blocks": b["blocks"]})
@@ -845,6 +920,27 @@ def create_app(database_url: str | None = None) -> Flask:
         b = owned_booking(ref)
         sync(b)
         return redirect(f"/bookings/{ref}", 303)
+
+    @app.get("/bookings/<ref>/calendar.ics")
+    def booking_ics(ref):
+        """Add to calendar: a read of stored values only (PUR-R37), for a confirmed booking."""
+        b = owned_booking(ref)
+        if b["status"] != "confirmed":
+            abort(404)
+
+        def utc(t):
+            return t.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+        def esc(s):
+            return re.sub(r"([\\;,])", r"\\\1", s).replace("\n", "\\n")
+        body = "\r\n".join([
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Cowork Booking//Purchase//EN", "BEGIN:VEVENT",
+            f"UID:{ref}@cowork-booking", f"DTSTAMP:{utc(clock.now())}", f"DTSTART:{utc(b['start_at'])}",
+            f"DTEND:{utc(b['end_at'])}", f"SUMMARY:{esc(b['space_name'])}",
+            f"DESCRIPTION:{esc('Cowork Booking ' + ref + ', party of ' + str(b['party_size']))}",
+            "END:VEVENT", "END:VCALENDAR", ""])
+        return Response(body, mimetype="text/calendar",
+                        headers={"Content-Disposition": f'attachment; filename="{ref}.ics"'})
 
     @app.get("/api/bookings/<ref>")
     def api_booking(ref):
@@ -867,11 +963,14 @@ def create_app(database_url: str | None = None) -> Flask:
         _, unknown, _ = reconcile_many([b for b in my_rows(m["id"]) if b["status"] == "held"])
         now = clock.now()
         rows = my_rows(m["id"])
-        upcoming = [b for b in rows if b["end_at"] > now]
-        past = sorted((b for b in rows if b["end_at"] <= now), key=lambda b: b["start_at"], reverse=True)
+        # Cancelled and expired bookings are not coming up: they sit with the past ones.
+        upcoming = [b for b in rows if b["end_at"] > now and b["status"] in ("held", "confirmed")]
+        past = sorted((b for b in rows if b not in upcoming), key=lambda b: b["start_at"], reverse=True)
         hold = own_hold(m["id"], now)
         return render_template("my_bookings.html", upcoming=upcoming, past=past, now=now, unknown=unknown,
-                               hold=hold, hold_text=held_message(hold, now) if hold else None)
+                               hold=hold, hold_text=held_message(hold, now) if hold else None,
+                               hold_left=int((deadline(hold) - now).total_seconds()) if hold else 0,
+                               view="past" if request.args.get("view") == "past" else "upcoming")
 
     # --- cancel and retry ---
 
@@ -886,7 +985,8 @@ def create_app(database_url: str | None = None) -> Flask:
             return go(f"/bookings/{ref}", block.message)
         text, shown = cancel_screen(b, by_operator, unknown)
         return render_template("cancel.html", b=b, text=text, shown=shown, by_operator=by_operator,
-                               return_to=request.args.get("return_to") == "booking")
+                               return_to=request.args.get("return_to") == "booking",
+                               operator_view=b["member_id"] != g.member["id"])
 
     def do_cancel_form(ref, by_operator: bool, done_url: str):
         b = owned_booking(ref)
@@ -965,21 +1065,30 @@ def create_app(database_url: str | None = None) -> Flask:
     @app.get("/operator/bookings")
     def operator_bookings():
         require_operator()
-        rows = app.db.execute(BOOKING_SQL + " ORDER BY (b.refund_status IN ('pending', 'failed')) DESC, "
-                              "b.refund_requested_at ASC NULLS LAST, b.start_at DESC").fetchall()
+        rows = app.db.execute(BOOKING_SQL).fetchall()
         now = clock.now()
         for b in rows:
-            flags = []
-            if b["status"] == "confirmed" and b["grant_status"] == "pending":
-                flags.append("being_prepared")
-            if b["grant_status"] == "revoke_pending":
-                flags.append("revocation_pending")
-            if b["refund_status"] == "pending":
-                flags.append("refund_pending")
-            if b["refund_status"] == "failed":
-                flags.append("refund_failed")
-            b["flags"] = flags
-        return render_template("operator_bookings.html", rows=rows, now=now)
+            b["flags"] = flags_of(b)
+        # Date scope: flagged rows always show, whatever the scope, because they need a person.
+        when = request.args.get("when", "upcoming")
+        when = when if when in ("upcoming", "today", "past", "any") else "upcoming"
+        in_scope = {"upcoming": lambda b: b["end_at"] > now, "past": lambda b: b["end_at"] <= now,
+                    "today": lambda b: today(b["start_at"]) == today(now), "any": lambda b: True}[when]
+        # Search: reference, member email or name, or room, as a door call or a Member's phone call gives it.
+        q = request.args.get("q", "").strip()
+        scoped = [b for b in rows if (b["flags"] or in_scope(b)) and q.upper() in " ".join(
+            (b["reference"], b["member_email"], b["member_name"], b["space_name"])).upper()]
+        # Flagged first, refunds owed oldest first; then by start (soonest first for upcoming and today).
+        far, sign = datetime.max.replace(tzinfo=BKK), 1 if when in ("upcoming", "today") else -1
+        scoped.sort(key=lambda b: (not b["flags"], (b["refund_requested_at"] or far) if b["flags"] else far,
+                                   sign * b["start_at"].timestamp()))
+        counts = {k: sum(1 for b in scoped if b["status"] == k) for k in ("held", "confirmed", "expired", "cancelled")}
+        counts.update(all=len(scoped), flagged=sum(1 for b in scoped if b["flags"]))
+        status = request.args.get("status", "all")
+        status = status if status in counts else "all"
+        shown = [b for b in scoped if status == "all" or b["status"] == status or (status == "flagged" and b["flags"])]
+        return render_template("operator_bookings.html", rows=shown, now=now, counts=counts, status=status, q=q,
+                               when=when, total=len(rows))
 
     def space_error(form, space_id=None) -> str | None:
         name = form.get("name", "").strip()
@@ -999,8 +1108,25 @@ def create_app(database_url: str | None = None) -> Flask:
     @app.get("/operator/spaces")
     def operator_spaces():
         require_operator()
-        rows = app.db.execute("SELECT * FROM spaces ORDER BY archived_at IS NOT NULL, id").fetchall()
-        return render_template("operator_spaces.html", rows=rows)
+        rows = app.db.execute(
+            "SELECT s.*, count(b.id) AS upcoming FROM spaces s LEFT JOIN bookings b ON b.space_id = s.id "
+            "AND b.status IN ('held', 'confirmed') AND b.end_at > %s GROUP BY s.id "
+            "ORDER BY s.archived_at IS NOT NULL, s.id", (clock.now(),)).fetchall()
+        edit = to_int(request.args.get("edit", ""))
+        editing = next((s for s in rows if s["id"] == edit and s["archived_at"] is None), None)
+        return render_template("operator_spaces.html", rows=rows, editing=editing)
+
+    def live_bookings(space_id):
+        """PUR-R16: the held or confirmed bookings that end after now and so stop an archive."""
+        return app.db.execute(BOOKING_SQL + " WHERE b.space_id = %s AND b.status IN ('held', 'confirmed') "
+                              "AND b.end_at > %s ORDER BY b.start_at", (space_id, clock.now())).fetchall()
+
+    @app.get("/operator/spaces/<int:space_id>/archive")
+    def operator_space_archive_form(space_id):
+        """The confirm step before an archive, which cannot be undone (a read only, PUR-R37)."""
+        require_operator()
+        space = open_space(space_id)
+        return render_template("archive.html", space=space, live=live_bookings(space_id), now=clock.now())
 
     @app.post("/operator/spaces")
     def operator_space_create():
@@ -1031,9 +1157,7 @@ def create_app(database_url: str | None = None) -> Flask:
         s = app.db.execute("SELECT * FROM spaces WHERE id = %s", (space_id,)).fetchone() or abort(404)
         if s["archived_at"] is None:
             now = clock.now()
-            live = app.db.execute("SELECT reference, status FROM bookings WHERE space_id = %s "
-                                  "AND status IN ('held', 'confirmed') AND end_at > %s ORDER BY start_at",
-                                  (space_id, now)).fetchall()
+            live = live_bookings(space_id)
             if live:
                 refs = ", ".join(r["reference"] + (" (held)" if r["status"] == "held" else "") for r in live)
                 return go("/operator/spaces", f"Cancel its upcoming bookings first: {refs}")
@@ -1044,8 +1168,14 @@ def create_app(database_url: str | None = None) -> Flask:
     @app.get("/operator/members")
     def operator_members():
         require_operator()
-        rows = app.db.execute("SELECT * FROM members ORDER BY id").fetchall()
-        return render_template("operator_members.html", rows=rows)
+        q = request.args.get("q", "").strip()
+        rows = app.db.execute(
+            "SELECT m.*, count(b.id) FILTER (WHERE b.status IN ('held', 'confirmed')) AS upcoming, "
+            "count(b.id) FILTER (WHERE b.status = 'confirmed' AND b.coverage = 'plan') AS upcoming_plan "
+            "FROM members m LEFT JOIN bookings b ON b.member_id = m.id AND b.end_at > %s "
+            "WHERE strpos(lower(m.email || ' ' || m.display_name), lower(%s)) > 0 GROUP BY m.id ORDER BY m.id",
+            (clock.now(), q)).fetchall()
+        return render_template("operator_members.html", rows=rows, q=q)
 
     @app.post("/operator/members/<int:member_id>/plan")
     def operator_plan(member_id):
@@ -1082,9 +1212,18 @@ def create_app(database_url: str | None = None) -> Flask:
         spaces = app.db.execute("SELECT count(*) AS n FROM spaces WHERE archived_at IS NULL").fetchone()["n"]
         booked = sum(hours.values())
         utilization = booked / (12 * spaces * 7) if spaces else 0.0
+        # The work view first: today's slot-blocking bookings (ended ones too, the day's schedule) and the next ones
+        # after today. Counts and times only, no money (PUR-R34).
+        day0 = datetime.combine(today(now), time(0), BKK)
+        live = (BOOKING_SQL + " WHERE " + BLOCKING + " AND b.start_at >= %(lo)s AND b.start_at < %(hi)s "
+                "ORDER BY b.start_at")
+        on_today = app.db.execute(live, {"now": now, "lo": day0, "hi": day0 + timedelta(days=1)}).fetchall()
+        coming = app.db.execute(live + " LIMIT 6", {"now": now, "lo": day0 + timedelta(days=1),
+                                                    "hi": day0 + timedelta(days=32)}).fetchall()
         return render_template(
             "dashboard.html", status={k: status.get(k, 0) for k in ("held", "confirmed", "expired", "cancelled")},
             hours={k: hours_text(hours.get(k, 0)) for k in ("pay", "plan", "free")}, members=members,
-            utilization=utilization, period_from=lo.date(), period_to=today(now))
+            utilization=utilization, period_from=lo.date(), period_to=today(now), spaces=spaces, coming=coming,
+            on_today=on_today, now=now)
 
     return app

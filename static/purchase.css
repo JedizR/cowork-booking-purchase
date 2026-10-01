@@ -1,0 +1,372 @@
+/* Purchase-only additions on top of the shared design system (style.css, unchanged).
+   Black and white only: status is fill plus words. Tokens come from style.css. */
+
+.skip-link { position: absolute; left: -9999px; top: 8px; z-index: 100; padding: 8px 16px; border-radius: var(--r-pill); background: var(--canvas); color: var(--ink); }
+.skip-link:focus { left: 16px; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* ---- Top nav: Operator menu with the attention count, account menu, Sign up pill ---- */
+.topnav-menu { position: relative; flex: none; }
+.topnav-menu summary {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--r-pill); list-style: none; cursor: pointer;
+  color: var(--on-dark-muted); font-size: var(--fs-caption); white-space: nowrap; transition: color var(--dur) var(--ease);
+}
+.topnav-menu summary::-webkit-details-marker { display: none; }
+.topnav-menu summary::after { content: ""; width: 6px; height: 6px; margin-top: -3px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.topnav-menu summary:hover, .topnav-menu[open] summary { color: var(--on-dark); }
+.topnav-menu summary.is-active { color: var(--on-dark); background: rgba(255, 255, 255, 0.14); }
+.nav-count, .tab-count, .btn-count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 700; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.nav-count { background: var(--on-dark); color: var(--black); }
+.tab-count, .btn-count { background: var(--ink); color: var(--on-dark); }
+.btn-primary .btn-count { background: var(--on-dark); color: var(--ink); }
+.topnav-menu-panel {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; min-width: 220px; padding: 6px;
+  display: flex; flex-direction: column; background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
+.topnav-menu-panel a, .topnav-menu-panel button:not(.btn) {
+  appearance: none; display: flex; align-items: center; gap: 6px; min-height: 40px; margin: 0; padding: 9px 12px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--ink); font: 400 var(--fs-caption) / 1.3 var(--font); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.topnav-links .topnav-menu-panel a { color: var(--ink); }
+.topnav-menu-panel a:hover, .topnav-menu-panel button:not(.btn):hover { background: var(--parchment); color: var(--ink); }
+.topnav-links .topnav-menu-panel a[aria-current="page"] { background: var(--parchment); color: var(--ink); font-weight: 600; }
+.topnav-links .topnav-menu-panel a:last-child { margin-top: 4px; border-top: 1px solid var(--divider-soft); border-radius: 0 0 var(--r-sm) var(--r-sm); }
+.topnav-menu-panel :focus-visible { outline-color: var(--black); }
+@media (max-width: 833px) { .topnav-links .topnav-menu-panel { position: fixed; top: 96px; left: var(--gutter); right: var(--gutter); } }
+/* Account: the avatar opens who is logged in, My bookings and Log out (one place, not a loud pill). */
+.topnav-account summary { padding: 4px 10px 4px 4px; gap: var(--sp-2); color: var(--on-dark); max-width: 300px; }
+.topnav-account summary:hover, .topnav-account[open] summary { background: rgba(255, 255, 255, 0.12); }
+.topnav-account .topnav-menu-panel { left: auto; right: 0; min-width: 240px; }
+/* Log out is a real button, not a menu row (PUR-R37: a POST). */
+.topnav-account .topnav-menu-panel form { display: block; margin: 4px 0 0; padding: 8px 6px 4px; border-top: 1px solid var(--divider-soft); }
+.account-who { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px; padding: 8px 12px 10px; border-bottom: 1px solid var(--divider-soft); font-size: var(--fs-caption); color: var(--ink); letter-spacing: -0.005em; }
+.account-who span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.topnav-user { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.topnav-avatar {
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--on-dark); color: var(--black); font-size: 12px; font-weight: 700; letter-spacing: 0;
+}
+.topnav-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topnav-link { color: var(--on-dark-muted); text-decoration: none; padding: 6px 4px; }
+.topnav-link:hover, .topnav-link[aria-current="page"] { color: var(--on-dark); text-decoration: none; }
+.topnav-btn-solid { background: var(--on-dark); border-color: var(--on-dark); color: var(--black); font-weight: 600; }
+.topnav-btn-solid:hover { background: var(--fill); }
+/* The bar shows the avatar and the display name only (the email is inside the menu); long names truncate. */
+.topnav-account .topnav-name { max-width: 180px; }
+@media (max-width: 640px) { .topnav-account .topnav-name { max-width: 120px; } }
+@media (max-width: 419px) { .topnav-account .topnav-name { max-width: 96px; } .topnav-name-rest { display: none; } }
+/* Logged out the only link is Spaces: it stays in the first row, and on a phone the brand (home) stands for it. */
+@media (max-width: 833px) { .topnav-links.is-solo { order: 0; flex: none; padding: 0; margin: 0; } }
+@media (max-width: 640px) { .topnav-links.is-solo { display: none; } }
+/* Operator tabs: on a phone the five fit in one row (style.css), the current one scrolled into view on narrower screens. */
+.subnav .tabs a { gap: 6px; }
+.tab-count { min-width: 18px; height: 18px; font-size: 11px; }
+
+/* ---- Spaces grid: one quiet cover style; capacity is the big number ---- */
+.space-grid { row-gap: var(--sp-6); }
+.space-grid .space-card .space-card-cover { aspect-ratio: 16 / 9; background: var(--parchment); color: var(--ink); border: 0; }
+.space-grid .space-card .space-card-cover .badge-solid { background: var(--ink); color: var(--on-dark); }
+.space-grid .space-card-mark b { font-size: 56px; font-weight: 600; letter-spacing: -0.035em; }
+.space-grid .space-card-mark span { font-size: var(--fs-callout); opacity: 1; color: var(--muted); }
+.space-card-body .space-card-price { margin: 2px 0 0; white-space: normal; }
+.space-card-body .space-card-meta { margin-top: 2px; }
+@media (max-width: 640px) { .space-grid .space-card .space-card-cover { aspect-ratio: 21 / 9; } .space-grid .space-card-mark b { font-size: 44px; } }
+
+/* ---- Space page: facts, calendar, date strip, timeline, details, sticky bar ---- */
+.space-header { margin-bottom: var(--sp-5); }
+.page-space { padding-bottom: 0; }
+.page-space + .footer { margin-top: 0; }
+.space-facts { margin-top: var(--sp-2); color: var(--muted); font-size: var(--fs-callout); align-items: center; }
+.hold-banner { margin-bottom: var(--sp-6); }
+.hold-banner .alert-title a { color: inherit; }
+.picker { margin-bottom: var(--sp-7); }
+.picker-date, .picker-time, .picker-details { min-width: 0; }
+.cal-card { padding: var(--sp-5) var(--sp-5) var(--sp-4); }
+.cal { max-width: none; }
+.cal-nav a.btn-icon { color: var(--ink); text-decoration: none; }
+.cal-nav .btn-icon.is-disabled { background: transparent; color: var(--fill-strong); }
+.cal-foot { margin: var(--sp-3) 0 0; text-align: center; }
+/* A day with no free block stays reachable (the page says why) but reads as full. */
+.cal-day.is-full:not(.is-selected) { color: var(--muted-48); font-weight: 400; text-decoration: line-through; text-decoration-thickness: 1px; }
+.date-strip { display: none; }
+.timeline-title-solo { margin-bottom: var(--sp-4); }
+/* style.css's dashed even-row line out-specifies the range fill; keep the selected and previewed range solid. */
+.timeline-slots > .slot.is-selected .slot-body, .timeline-slots > .slot.is-preview .slot-body { border-top-color: transparent; }
+.slot-body > * { pointer-events: none; }
+.timeline-hint { white-space: nowrap; }
+/* Today's leading "Too soon" run, folded into one row above the first time that can be booked. */
+.timeline-before { display: grid; grid-template-columns: var(--gutter-w) minmax(0, 1fr); margin: 0; min-height: var(--slot-h); }
+.timeline-before .slot-time { color: var(--muted-48); font-weight: 400; }
+.timeline-before-body {
+  display: flex; align-items: center; padding: 0 var(--sp-4); border-top: 1px solid var(--hairline); font-size: var(--fs-caption);
+  background: var(--parchment) radial-gradient(var(--field-border) 0.9px, transparent 1.3px) 0 0 / 6px 6px;
+}
+.slot.is-unavailable .slot-reason, .timeline-before .slot-reason { background: var(--parchment); padding: 2px 6px; margin-left: -6px; border-radius: var(--r-xs); color: var(--ink-80); }
+/* The Member's own booking: booked (hatched) like any other, with an ink edge and a link to it. */
+a.slot[data-mine] { pointer-events: auto; cursor: pointer; }
+a.slot[data-mine]:hover .slot-reason { text-decoration: underline; }
+a.slot[data-mine]:focus-visible { outline: none; }
+a.slot[data-mine]:focus-visible .slot-body { outline: 2px solid var(--black); outline-offset: -2px; }
+.slot.is-booked:not([data-mine]) + .slot[data-mine] .slot-reason, .slot[data-mine] + .slot.is-booked:not([data-mine]) .slot-reason { visibility: visible; }
+.legend-swatch.is-mine { border: 1.5px solid var(--ink); }
+.slot.is-booked[data-mine] .slot-body { color: var(--ink); border-top: 0;
+  box-shadow: inset 1.5px 0 0 var(--ink), inset -1.5px 0 0 var(--ink), inset 0 1.5px 0 var(--top-c, transparent), inset 0 -1.5px 0 var(--bottom-c, transparent); }
+.slot.is-booked[data-mine]:not(.slot[data-mine] + .slot) .slot-body { --top-c: var(--ink); border-radius: var(--r-md) var(--r-md) 0 0; }
+.slot.is-booked[data-mine]:not(:has(+ .slot[data-mine])) .slot-body { --bottom-c: var(--ink); border-radius: 0 0 var(--r-md) var(--r-md); }
+.slot.is-booked[data-mine]:not(.slot[data-mine] + .slot):not(:has(+ .slot[data-mine])) .slot-body { border-radius: var(--r-md); }
+.slot.is-booked[data-mine] .slot-reason { background: var(--canvas); font-weight: 600; color: var(--ink); }
+/* The end handle: drag it to change the end (touch and mouse). */
+.range-handle {
+  position: absolute; z-index: 3; left: calc(50% + var(--gutter-w) / 2); width: 44px; height: 24px; margin: -12px 0 0 -22px;
+  display: grid; place-items: center; cursor: ns-resize; touch-action: none;
+}
+.range-handle::before { content: ""; width: 32px; height: 8px; border-radius: var(--r-pill); background: var(--canvas); border: 1.5px solid var(--ink); box-sizing: border-box; }
+.picker-details .card-title { margin-bottom: var(--sp-1); }
+.picker-details textarea { min-height: 72px; }
+.policy { border-top: 1px solid var(--divider-soft); padding-top: var(--sp-4); }
+.policy-title { margin: 0 0 2px; font-size: var(--fs-caption); font-weight: 600; }
+.sticky-bar-refund { font-size: var(--fs-caption); color: var(--ink); font-weight: 600; }
+.sticky-bar-hint { font-size: var(--fs-caption); color: var(--muted); }
+/* A range the rules changed or restarted: said in ink next to the summary, so the change is never silent. */
+.sticky-bar-hint.is-info { color: var(--ink); font-weight: 600; }
+.sticky-bar-hint.is-info::before {
+  content: "i"; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; vertical-align: -2px;
+  border-radius: 50%; border: 1.5px solid var(--ink); box-sizing: border-box; color: var(--ink); font-size: 10px; font-weight: 700;
+}
+.sticky-bar.is-preview .sticky-bar-title, .sticky-bar.is-preview .sticky-bar-meta { color: var(--muted); }
+.sticky-bar .btn:disabled { opacity: 1; }
+.sticky-bar-clear { min-height: 52px; }
+.noscript-duration { display: flex; align-items: flex-end; gap: var(--sp-4); margin-bottom: var(--sp-5); }
+.noscript-starts { margin-top: var(--sp-5); }
+.noscript-starts .card-title { margin-bottom: var(--sp-3); }
+.chip:has(input:disabled) { background: var(--pearl); color: var(--muted); cursor: not-allowed; }
+
+@media (max-width: 833px) {
+  .cal-card { display: none; }
+  /* Phones: the date strip stays under the finger while the day scrolls. */
+  .date-strip {
+    position: sticky; top: 0; z-index: 20; display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+    margin: 0 calc(-1 * var(--gutter)); padding: var(--sp-2) var(--gutter);
+    background: var(--frost); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  }
+  .date-strip::-webkit-scrollbar { display: none; }
+  .picker { gap: var(--sp-5); }
+}
+@media (max-width: 640px) {
+  .hold-banner .hold-why, .fold-why { display: none; }
+  .space-header { margin-bottom: var(--sp-4); }
+  .space-header .eyebrow { display: none; }
+  .back-link { margin-bottom: var(--sp-3); }
+  .timeline-head { display: none; }  /* the selected date chip and the bar already say both */
+  .timeline.is-locked .timeline-head { display: flex; }  /* no bar while a hold is live: say why the day cannot be picked */
+  .timeline-legend { margin-top: var(--sp-4); gap: var(--sp-2) var(--sp-4); }
+  /* Idle bar: one line and no disabled button until a start is picked. */
+  .sticky-bar.is-idle .sticky-bar-actions { display: none; }
+  .sticky-bar.is-idle .sticky-bar-inner { min-height: 40px; }
+  .sticky-bar.is-idle .sticky-bar-summary { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); }
+  [data-anon="1"] .sticky-bar.is-idle .sticky-bar-actions { display: contents; }
+  /* A picked range: summary with Clear beside it, then the one button, so the bar hides few rows of the day. */
+  .sticky-bar-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--sp-2) var(--sp-3); }
+  .sticky-bar-actions { display: contents; }
+  .sticky-bar-actions .sticky-bar-clear { grid-column: 2; grid-row: 1; min-height: 32px; padding: 5px 14px; font-size: var(--fs-caption); position: relative; }
+  .sticky-bar-clear::after { content: ""; position: absolute; inset: -6px -4px; }  /* a 44 px target around a small button */
+  #bar-btn { grid-column: 1 / -1; }
+  /* One muted line under the price: the hint while there is one, else the refund terms. */
+  .sticky-bar-summary:has(.sticky-bar-hint:not([hidden])) .sticky-bar-refund { display: none; }
+}
+.date-chip {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; width: 52px; padding: 6px 0 7px;
+  border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--canvas); color: var(--ink);
+  text-decoration: none; scroll-snap-align: center; transition: border-color var(--dur) var(--ease);
+}
+.date-chip:hover { border-color: var(--ink); text-decoration: none; }
+.date-chip:active { transform: scale(0.97); }
+.date-chip-dow { font-size: var(--fs-fine); color: var(--muted); letter-spacing: 0; }
+.date-chip-day { font-size: var(--fs-body); font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.date-chip-mon { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.date-chip.is-full:not(.is-selected) { background: var(--parchment); border-color: transparent; }
+.date-chip.is-full:not(.is-selected) .date-chip-day { color: var(--muted-48); font-weight: 400; text-decoration: line-through; text-decoration-thickness: 1px; }
+.date-chip.is-selected { background: var(--ink); border-color: var(--ink); color: var(--on-dark); }
+.date-chip.is-selected span { color: inherit; }
+
+/* ---- Booking page ---- */
+.booking-header { margin-bottom: var(--sp-5); }
+.booking-steps { margin-bottom: var(--sp-6); display: flex; }
+.booking-steps li { flex: 1 1 0; min-width: 0; }
+.booking-steps li:last-child { flex: none; padding-right: 0; }
+.status-line { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; gap: var(--sp-3); }
+.status-line + .status-line, .stack-sm + .status-line, .status-line + .ticket-strip { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--divider-soft); }
+.status-line-action { align-items: center; }
+.status-dot {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--ink); color: var(--on-dark); font-size: 13px; font-weight: 700; line-height: 1;
+}
+.status-dot svg { width: 16px; height: 16px; }
+.status-line:not(:first-child) .status-dot, .status-line.is-plain .status-dot { background: var(--canvas); color: var(--ink); border: 1.5px solid var(--ink); }
+.status-text { font-size: var(--fs-body); line-height: 1.45; min-width: 0; }
+.status-text .muted { font-size: var(--fs-callout); }
+.status-lead { margin: 0; font-weight: 600; }
+.pay-countdown { margin: 0; }
+.pay-countdown .countdown-left::before { content: none; }
+.status-card .card-footer { margin-top: var(--sp-5); }
+/* PUR-R41: the ticket code next to "View e-ticket", big and tabular like the ticket itself. */
+.ticket-strip { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-4); padding: var(--sp-4) var(--sp-5); border-radius: var(--r-md); background: var(--parchment); }
+.ticket-strip-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ticket-strip-code { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: 0.05em; white-space: nowrap; }
+.status-line.is-attention .status-dot { background: var(--ink); color: var(--on-dark); border: 0; }
+.summary-coverage { margin: var(--sp-3) 0 0; font-size: var(--fs-caption); color: var(--muted); }
+/* Plan and free: what it costs the member is the headline; the agreed price is a footnote, never a "Total". */
+.summary-lead { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+.summary-lead + .summary-coverage { margin-top: var(--sp-1); }
+.summary-refund { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--fill-strong); }
+.summary .caption { margin: 0; color: var(--ink-80); }
+.booking-aside { position: sticky; top: var(--sp-5); }
+.operator-card .dl { font-size: var(--fs-caption); }
+.operator-card .dl dt, .operator-card .dl dd { padding-top: 9px; padding-bottom: 9px; }
+.operator-card .dl dt { padding-right: var(--sp-4); white-space: nowrap; }
+.operator-card .dl dd.mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }  /* an id never breaks at its hyphen */
+@media (max-width: 640px) {
+  .status-card .card-footer > .btn, .status-card .card-footer > form { flex: 1 1 100%; }
+  .status-card .card-footer > form .btn { width: 100%; }
+  .ticket-strip { padding: var(--sp-4); }
+  .ticket-strip .btn { flex: 1 1 100%; }
+  .booking-steps li:last-child { padding-right: 0; }
+}
+@media (max-width: 833px) { .booking-aside { position: static; } .booking-aside .operator-card { order: -1; } }
+
+/* ---- Cancel and archive confirm ---- */
+.confirm-card { padding: var(--sp-6); }
+.confirm-title { margin: var(--sp-2) 0 0; font-size: var(--fs-heading); line-height: 1.22; letter-spacing: -0.018em; }
+.confirm-when { margin-top: var(--sp-2); color: var(--ink-80); font-size: var(--fs-callout); }
+.confirm-summary { margin-top: var(--sp-5); }
+.confirm-refund { margin: 0 0 var(--sp-3); font-size: var(--fs-tagline); font-weight: 600; line-height: 1.3; letter-spacing: -0.012em; font-variant-numeric: tabular-nums; }
+.confirm-refund.is-long { font-size: var(--fs-body); font-weight: 400; line-height: 1.45; letter-spacing: -0.01em; }
+.consequences { margin: 0; padding-left: 1.1em; font-size: var(--fs-callout); color: var(--ink-80); }
+.consequences li + li { margin-top: var(--sp-1); }
+.archive-list { margin-top: var(--sp-3); }
+.archive-list .list-item { padding: var(--sp-3) var(--sp-4); }
+@media (max-width: 640px) {
+  .confirm-card { padding: var(--sp-5); }
+  .confirm-card .form-actions .btn { flex: 1 1 100%; }
+}
+
+/* ---- My bookings ---- */
+.bookings-tabs { margin-bottom: var(--sp-5); }
+.segmented .seg-count { color: inherit; display: inline; min-height: 0; padding: 0; margin-left: 6px; font-weight: 400; opacity: 0.72; font-variant-numeric: tabular-nums; }
+.list-item-note { max-width: 34ch; font-size: var(--fs-caption); color: var(--muted); text-align: right; }
+.list-item-aside form { margin: 0; }
+.list-item-money { color: var(--ink-80); }
+.list-item.is-void .list-item-title a { color: var(--muted); }
+.list-item.is-void .date-tile-day { color: var(--muted); }
+@media (max-width: 640px) { .list-item-note { text-align: left; } }
+
+/* ---- Log in / sign up ---- */
+.auth { padding-top: var(--sp-4); }
+.auth-header { text-align: center; margin-bottom: var(--sp-5); }
+.auth-header .page-subtitle { margin-left: auto; margin-right: auto; }
+.auth-mark { width: 44px; height: 44px; margin-bottom: var(--sp-4); border-radius: 12px; background: var(--ink); color: var(--on-dark); font-size: 22px; }
+.auth-card { padding: var(--sp-6); }
+.auth-card .flashes { margin: 0; }
+.auth-switch { margin: var(--sp-5) 0 0; text-align: center; font-size: var(--fs-callout); color: var(--muted); }
+.auth-switch a { color: var(--ink); font-weight: 600; }
+.password { position: relative; }
+.field .password input { padding-right: 72px; }
+.password-toggle {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%); min-height: 34px; padding: 0 12px; border: 0; border-radius: var(--r-pill);
+  background: none; color: var(--ink-80); font: 600 var(--fs-caption) / 1 var(--font); cursor: pointer;
+}
+.password-toggle:hover { background: var(--parchment); color: var(--ink); }
+@media (max-width: 640px) { .auth-card { padding: var(--sp-5); } }
+
+/* ---- Operator ---- */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
+.toolbar-note { margin: 0; }
+.toolbar-search { flex: 0 1 300px; margin: 0; }
+.toolbar-search .search { min-height: 40px; font-size: var(--fs-callout); }
+.status-chips { margin-bottom: var(--sp-4); }
+.chip-count { opacity: 0.72; font-weight: 400; font-variant-numeric: tabular-nums; }
+.flag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ops-table td.cell-state { min-width: 160px; max-width: 220px; }
+.ops-table td { padding-left: 12px; padding-right: 12px; }
+@media (min-width: 641px) {
+  /* Row actions stack at the right edge, so a long "Retry refund · THB 300.00" never pushes the table wide. */
+  .ops-table td.row-actions > * { display: flex; justify-content: flex-end; width: fit-content; margin: 0 0 6px auto; }
+  .ops-table td.row-actions > :last-child { margin-bottom: 0; }
+}
+.table td.cell-wrap { white-space: normal; min-width: 150px; max-width: 200px; }
+.table td.cell-member { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.table td.cell-member .cell-sub { overflow: hidden; text-overflow: ellipsis; }
+.table .cell-state .badge + .cell-sub { margin-top: 4px; }
+.timeline .timeline-slots > .slot.is-preview:not(.is-selected):not(:disabled):hover .slot-body { background: var(--fill); }
+.table-foot { margin-top: var(--sp-3); }
+.table tr.is-editing td { background: var(--pearl); }
+.table tr.is-archived td { color: var(--muted); }
+.stack-label { display: none; }
+.dash-charts { margin-top: var(--sp-5); }
+.dash-fine { margin: var(--sp-4) 0 0; }
+.spaces-forms { margin-top: var(--sp-6); align-items: start; }
+#space-form { scroll-margin-top: 76px; }
+.switch-btn { appearance: none; margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--fs-callout); }
+.switch-btn[aria-checked="true"] .switch-track { background: var(--ink); }
+.switch-btn[aria-checked="true"] .switch-track::after { transform: translateX(20px); }
+.switch-btn:focus-visible { outline: none; }
+.switch-btn:focus-visible .switch-track { outline: 2px solid var(--black); outline-offset: 2px; }
+.switch-text { min-width: 2.2em; text-align: left; }
+.cell-plan .cell-sub { margin-top: 2px; }
+.not-found { margin-top: var(--sp-6); }
+.dash .bar-row { grid-template-columns: minmax(84px, 120px) minmax(0, 1fr) 4.5em; }
+/* Dashboard: work that needs a person (only when there is some), today and coming up, then the last 7 days. */
+.attention-alert { margin-bottom: var(--sp-5); border: 1.5px solid var(--ink); }
+.attention-alert .alert-icon { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
+.dash-now { align-items: start; margin-bottom: var(--sp-7); }
+.dash-now.is-quiet { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }  /* nothing today: one line, not half a row of blank */
+.dash-empty { margin: 0; font-size: var(--fs-callout); color: var(--muted); }
+.agenda { list-style: none; margin: 0; padding: 0; }
+.agenda-day { padding: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-fine); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.agenda-day:first-child { padding-top: 0; }
+.agenda-row a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; border-bottom: 1px solid var(--divider-soft); text-decoration: none; }
+.agenda-row a:hover strong { text-decoration: underline; }
+.agenda-row a > .num { font-size: var(--fs-callout); font-weight: 600; }
+.agenda-what { min-width: 0; font-size: var(--fs-callout); }
+.agenda-what strong, .agenda-what .cell-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-period { margin-bottom: var(--sp-4); }
+.dash-period .caption { margin-top: 0; margin-bottom: 0; }
+@media (max-width: 640px) {
+  .toolbar-search { flex: 1 1 100%; }
+  .toolbar .segmented { max-width: 100%; }
+  .dash-now { margin-bottom: var(--sp-6); }
+  /* Stacked operator rows (style.css .table-stack): what it is, its state and money on line 1; when and
+     who on line 2; the row's actions, full width, on line 3. The row's gap separates the facts of a line, so a
+     wrapped line never starts with a dot. */
+  .table-stack td.cell-state { order: 1; color: var(--ink); }
+  .table-stack td.cell-state .cell-sub { display: inline; margin: 0 0 0 6px; }
+  .table-stack td.cell-when, .table-stack td.cell-member { order: 3; }
+  .table-stack td.cell-when .cell-sub, .table-stack td.cell-when > span { display: inline; }
+  .table-stack td.cell-when .cell-sub::before { content: ", "; }
+  .table-stack td.cell-member { max-width: none; }
+  .table-stack td.cell-member .cell-sub { display: none; }
+  .table-stack td.cell-money { order: 3; flex-basis: 100%; text-align: left; color: var(--ink); font-size: var(--fs-caption); font-weight: 600; }
+  .table-stack td.cell-money .cell-sub { display: inline; margin-left: 6px; font-weight: 400; }
+  .table-stack td.cell-state { max-width: none; }
+  .table-stack td.cell-state .flag-list { display: inline-flex; margin: 0 0 0 6px; vertical-align: middle; }
+  .table-stack td.cell-state .flag-list ~ .cell-sub { display: block; margin: 4px 0 0; }
+  .table-stack td.row-actions > form { flex: 1 1 auto; }
+  .table-stack td.row-actions .btn { min-height: var(--h-control); }
+  .table-stack td.row-actions > form .btn { width: 100%; }
+  .table-stack td.row-actions > a.btn { flex: none; }
+  .table-stack td.row-actions:not(:has(*)) { display: none; }
+  .table-stack .stack-label { display: inline; }
+  /* Members: the plan switch is the page's action, so it sits on line 1. */
+  .members-table td.cell-plan { display: contents; }
+  .members-table td.cell-plan > form { order: 1; }
+  .members-table td.cell-plan > .cell-sub { order: 3; flex-basis: 100%; margin: 0; }
+  .members-table td.cell-role.is-plain { display: none; }
+  .members-table td.col-num, .members-table td.cell-role, .members-table td.cell-joined { order: 3; font-weight: 400; font-size: var(--fs-caption); color: var(--muted); }
+  .members-table td.cell-role .badge { height: 20px; }
+  /* Spaces: name and status on line 1, size and rate on line 2, Edit and Archive on line 3. */
+  .spaces-table td.col-num { order: 3; font-weight: 400; font-size: var(--fs-caption); color: var(--ink-80); }
+  .spaces-table td.col-num .cell-sub { display: none; }
+}

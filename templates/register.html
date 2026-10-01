@@ -1,12 +1,36 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Sign up{% endblock %}
+{% block width %} container-narrow{% endblock %}
+{% block flashes %}{% endblock %}
 {% block content %}
-  <h1>Sign up</h1>
-  <form method="post" action="/register">
-    <input type="email" name="email" placeholder="Email" required>
-    <input name="display_name" placeholder="Display name" required maxlength="50">
-    <input type="password" name="password" placeholder="Password (8+ characters)" required minlength="8">
-    <button type="submit">Sign up</button>
-  </form>
-  <p class="hint">Already have an account? <a href="/login">Log in</a></p>
+  <section class="auth">
+    <header class="auth-header">
+      <span class="brand-mark auth-mark" aria-hidden="true">C</span>
+      <h1 class="page-title">Create your account</h1>
+      <p class="page-subtitle">Your bookings stay yours: only you and the operator see them.</p>
+    </header>
+    <form class="card auth-card stack stack-sm" method="post" action="/register">
+      {{ ui.flashes() }}
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" autocomplete="email" value="{{ typed.email or '' }}" required autofocus>
+      </div>
+      <div class="field">
+        <label for="display_name">Display name</label>
+        <input id="display_name" name="display_name" autocomplete="name" value="{{ typed.display_name or '' }}" required maxlength="50" aria-describedby="name-help">
+        <p class="help" id="name-help">Up to 50 letters, digits or spaces. Shown next to your email.</p>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="password">
+          <input id="password" type="password" name="password" autocomplete="new-password" required minlength="8" aria-describedby="pw-help">
+          <button class="password-toggle" type="button" data-show-password aria-controls="password" hidden>Show</button>
+        </div>
+        <p class="help" id="pw-help">At least 8 characters.</p>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Sign up</button>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+  </section>
 {% endblock %}

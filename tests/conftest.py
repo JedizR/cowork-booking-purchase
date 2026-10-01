@@ -35,7 +35,8 @@ class FakePayment:
         sid = f"ps_{len(self.sessions) + 1:022d}"
         self.sessions[sid] = {"id": sid, "url": f"http://localhost:8002/pay/{sid}", "status": "open",
                               "payment_status": "unpaid", "amount_satang": amount_satang, "currency": "THB",
-                              "booking_reference": booking_reference, "expires_at": expires_at.isoformat()}
+                              "booking_reference": booking_reference, "expires_at": expires_at.isoformat(),
+                              "description": description}
         return dict(self.sessions[sid])
 
     def get_session(self, sid):
@@ -83,6 +84,11 @@ class FakeAccess:
             "valid_from": valid_from.isoformat(), "valid_until": valid_until.isoformat()})
         return dict(g)
 
+    def get_grant(self, booking_reference):  # a read (PUR-R41): kept out of `calls`, which lists the writes
+        if self.down:
+            raise CallFailed("Access")
+        return dict(self.grants[booking_reference])
+
     def revoke_grant(self, booking_reference):
         self._call("revoke")
         g = self.grants.setdefault(booking_reference, {"booking_reference": booking_reference,
@@ -96,7 +102,7 @@ def stubs(monkeypatch):
     pay, axs = FakePayment(), FakeAccess()
     for name in ("create_session", "get_session", "expire_session", "create_refund"):
         monkeypatch.setattr(app_module.payment_client, name, getattr(pay, name))
-    for name in ("create_grant", "revoke_grant"):
+    for name in ("create_grant", "revoke_grant", "get_grant"):
         monkeypatch.setattr(app_module.access_client, name, getattr(axs, name))
     return pay, axs
 
