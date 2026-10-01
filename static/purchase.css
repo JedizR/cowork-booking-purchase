@@ -26,12 +26,12 @@
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; min-width: 220px; padding: 6px;
   display: flex; flex-direction: column; background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--r-md);
 }
-.topnav-menu-panel a, .topnav-menu-panel button {
+.topnav-menu-panel a, .topnav-menu-panel button:not(.btn) {
   appearance: none; display: flex; align-items: center; gap: 6px; min-height: 40px; margin: 0; padding: 9px 12px; border: 0; border-radius: var(--r-sm);
   background: none; color: var(--ink); font: 400 var(--fs-caption) / 1.3 var(--font); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
 }
 .topnav-links .topnav-menu-panel a { color: var(--ink); }
-.topnav-menu-panel a:hover, .topnav-menu-panel button:hover { background: var(--parchment); color: var(--ink); }
+.topnav-menu-panel a:hover, .topnav-menu-panel button:not(.btn):hover { background: var(--parchment); color: var(--ink); }
 .topnav-links .topnav-menu-panel a[aria-current="page"] { background: var(--parchment); color: var(--ink); font-weight: 600; }
 .topnav-links .topnav-menu-panel a:last-child { margin-top: 4px; border-top: 1px solid var(--divider-soft); border-radius: 0 0 var(--r-sm) var(--r-sm); }
 .topnav-menu-panel :focus-visible { outline-color: var(--black); }
@@ -40,8 +40,8 @@
 .topnav-account summary { padding: 4px 10px 4px 4px; gap: var(--sp-2); color: var(--on-dark); max-width: 300px; }
 .topnav-account summary:hover, .topnav-account[open] summary { background: rgba(255, 255, 255, 0.12); }
 .topnav-account .topnav-menu-panel { left: auto; right: 0; min-width: 240px; }
-.topnav-account .topnav-menu-panel form { margin: 0; display: block; border-top: 1px solid var(--divider-soft); margin-top: 4px; padding-top: 4px; }
-.topnav-account .topnav-menu-panel button { width: 100%; }
+/* Log out is a real button, not a menu row (PUR-R37: a POST). */
+.topnav-account .topnav-menu-panel form { display: block; margin: 4px 0 0; padding: 8px 6px 4px; border-top: 1px solid var(--divider-soft); }
 .account-who { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px; padding: 8px 12px 10px; border-bottom: 1px solid var(--divider-soft); font-size: var(--fs-caption); color: var(--ink); letter-spacing: -0.005em; }
 .account-who span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .topnav-user { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
