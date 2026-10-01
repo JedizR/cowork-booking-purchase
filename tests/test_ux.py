@@ -1,0 +1,86 @@
+"""The server side of the redesigned pages: the timeline's per-slot state (PUR-R13 at one block), the horizon
+calendar (PUR-R10), flash looks (PUR-R36) and the list filters."""
+import re
+from datetime import date, datetime
+
+from app import flash_kind
+from conftest import book_json, member, set_clock
+from purchase import BKK, month
+
+
+def slot(html, hhmm):
+    """(classes, disabled) of the timeline button for one 30-min block."""
+    m = re.search(r'<button type="button" class="(slot[^"]*)" data-i="\d+" data-time="' + hhmm + r'"([^>]*)>', html)
+    return m.group(1), "disabled" in m.group(2)
+
+
+def test_pur_r13_timeline_marks_each_block_free_or_with_its_reason(app):
+    a = member(app)
+    book_json(a)  # 09:00-10:30 held, slot-blocking
+    html = a.get("/spaces/1?date=2026-10-07").get_data(as_text=True)
+    assert html.count('<button type="button" class="slot') == 24 and "timeline-end" in html
+    assert slot(html, "08:30") == ("slot", False)  # ends where the booking starts (PUR-R11)
+    for t in ("09:00", "09:30", "10:00"):
+        assert slot(html, t) == ("slot is-booked", True)
+    assert slot(html, "10:30") == ("slot", False) and slot(html, "19:30") == ("slot", False)  # 1 block ends 20:00
+    assert 'aria-label="09:00 to 09:30, booked"' in html and "Runs past 20:00</span>" not in html
+    today = a.get("/spaces/1?date=2026-10-05").get_data(as_text=True)  # clock 10:00: before 11:00 is too soon
+    assert slot(today, "10:30") == ("slot is-unavailable", True) and slot(today, "11:00") == ("slot", False)
+
+
+def test_pur_r13_day_without_a_free_block_offers_the_next_day(app):
+    a = member(app)
+    set_clock(a, "2026-10-05T19:00:00+07:00")
+    html = a.get("/spaces/1?date=2026-10-05").get_data(as_text=True)
+    assert "No free time on this date" in html and 'class="slot' not in html
+    assert 'href="/spaces/1?date=2026-10-06"' in html
+
+
+def test_pur_r10_calendar_offers_only_the_horizon():
+    now = datetime(2026, 10, 5, 10, 0, tzinfo=BKK)
+    oct_ = month(date(2026, 10, 7), now)
+    days = [c for c in oct_["days"] if c]
+    assert oct_["days"][:3] == [None] * 3 and len(oct_["days"]) % 7 == 0  # 1 Oct 2026 is a Thursday
+    assert [c["bookable"] for c in days[3:5]] == [False, True] and all(c["bookable"] for c in days[4:])
+    assert (oct_["prev"], oct_["next"]) == (None, date(2026, 11, 1))
+    nov = month(date(2026, 11, 1), now)
+    assert [c["date"].day for c in nov["days"] if c and c["bookable"]] == [1, 2, 3, 4]
+    assert (nov["prev"], nov["next"]) == (date(2026, 10, 5), None)
+    mar = month(date(2027, 3, 1), datetime(2027, 1, 31, 9, 0, tzinfo=BKK))  # a horizon over three months
+    assert mar["prev"] == date(2027, 2, 1) and [c["date"].day for c in mar["days"] if c and c["bookable"]] == [1, 2]
+
+
+def test_pur_r10_calendar_links_keep_the_blocks(app):
+    html = app.test_client().get("/spaces/1?date=2026-10-07&blocks=3").get_data(as_text=True)
+    assert 'href="/spaces/1?date=2026-10-08&amp;blocks=3"' in html and 'data-default-blocks="3"' in html
+    assert 'class="cal-day is-disabled" aria-disabled="true">4<' in html  # yesterday
+
+
+def test_pur_r36_flash_look_follows_the_outcome():
+    assert [flash_kind(m) for m in ("Booking cancelled", "Refund attempt 2 succeeded", "Plan on for b@example.com",
+                                    "Nothing to retry", "1 confirmed, 0 expired, 0 cancelled, 0 unchanged",
+                                    "Slot just taken", "Refund attempt 1 failed")] == \
+        ["success", "success", "success", "info", "info", "error", "error"]
+
+
+def test_my_bookings_splits_upcoming_and_past(app):
+    a = member(app)
+    ref = book_json(a, start="2026-10-05T12:00:00+07:00", blocks=1).get_json()["reference"]
+    assert ref in a.get("/bookings/mine").get_data(as_text=True)
+    set_clock(a, "2026-10-05T13:00:00+07:00")
+    assert ref not in a.get("/bookings/mine").get_data(as_text=True)
+    assert ref in a.get("/bookings/mine?view=past").get_data(as_text=True)
+
+
+def test_operator_bookings_filter_and_search(app):
+    op, a, b = member(app, "operator@example.com", "Operator"), member(app), member(app, "b@example.com", "B")
+    ref = book_json(a).get_json()["reference"]
+    other = book_json(b, space_id=4, party_size=1).get_json()["reference"]  # free: confirmed at once
+    assert ref in op.get("/operator/bookings?status=held").get_data(as_text=True)
+    html = op.get("/operator/bookings?status=confirmed").get_data(as_text=True)
+    assert other in html and f'data-booking-reference="{ref}"' not in html
+    html = op.get(f"/operator/bookings?q={ref.lower()}").get_data(as_text=True)
+    assert f'data-booking-reference="{ref}"' in html and f'data-booking-reference="{other}"' not in html
+    assert "No bookings match" in op.get("/operator/bookings?q=BK-NONE").get_data(as_text=True)
+    edit = op.get("/operator/spaces?edit=1").get_data(as_text=True)
+    assert 'action="/operator/spaces/1"' in edit and 'value="Meeting Room A"' in edit
