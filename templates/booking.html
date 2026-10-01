@@ -4,11 +4,11 @@
   {% set op = me.is_operator %}
   {% set retry_action = "/operator/bookings/" ~ b.reference ~ "/retry" if op else "/bookings/" ~ b.reference ~ "/retry" %}
   {% macro retry() %}<form method="post" action="{{ retry_action }}"><input type="hidden" name="return_to" value="booking"><button type="submit">Retry</button></form>{% endmacro %}
-  {% macro cancel_link() %}<a class="button" href="/bookings/{{ b.reference }}/cancel{% if op %}?return_to=booking{% endif %}">Cancel</a>{% endmacro %}
+  {% macro cancel_link() %}<a class="button secondary" href="/bookings/{{ b.reference }}/cancel{% if op %}?return_to=booking{% endif %}">Cancel</a>{% endmacro %}
   <h1>Booking {{ b.reference }}</h1>
-  <p><strong>Status: {% if b.status == "confirmed" and now >= b.end_at %}Completed{% else %}{{ b.status }}{% endif %}</strong></p>
+  <p><span class="badge{% if b.status == 'confirmed' %} solid{% endif %}">{% if b.status == "confirmed" and now >= b.end_at %}Completed{% else %}{{ b.status }}{% endif %}</span></p>
   <p>{{ b.space_name }}, {{ b.start_at|local_time }}-{{ b.end_at|hhmm }} (Bangkok time)</p>
-  <p>Price {{ b.agreed_price_satang|money }}, coverage {{ b.coverage }}, payment {{ b.payment_status }}. Party of {{ b.party_size }}.</p>
+  <p><span class="price">{{ b.agreed_price_satang|money }}</span> · {% if b.coverage == "plan" %}covered by your plan, no payment taken{% elif b.coverage == "free" %}free, no payment taken{% elif b.payment_status == "paid" %}paid by card{% else %}not paid yet{% endif %} · party of {{ b.party_size }}</p>
   {% if b.note %}<p>Note: {{ b.note }}</p>{% endif %}
   {% if op %}<p>Member: {{ b.member_name }} ({{ b.member_email }}){% if b.cancelled_at %}. Cancelled {{ b.cancelled_at|local_time }}{% endif %}</p>{% endif %}
 
@@ -69,7 +69,7 @@
       {% endif %}
     {% endif %}
     {% if b.grant_status == "issued" and b.ticket_url %}
-      <p><a href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a></p>
+      <p><a class="button" href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a></p>
     {% elif b.grant_status == "pending" %}
       <p>Your e-ticket is being prepared</p>{{ retry() }}
     {% endif %}
@@ -98,7 +98,7 @@
   {% endif %}
   {% if b.grant_status == "revoke_pending" %}<p>Your ticket is still being cancelled; any refund follows.</p>{{ retry() }}{% endif %}
   {% if b.status == "cancelled" %}
-    {% if b.grant_status == "revoked" and b.ticket_url %}<p><a href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a></p>{% endif %}
+    {% if b.grant_status == "revoked" and b.ticket_url %}<p><a class="button" href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a></p>{% endif %}
     {% if own and b.payment_status == "unpaid" %}<p><a href="{{ book_again }}">Book again</a></p>{% endif %}
   {% endif %}
   <p><a href="/bookings/mine">My bookings</a></p>
