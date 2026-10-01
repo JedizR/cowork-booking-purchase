@@ -1,8 +1,9 @@
+# Purchase on its own: the app on http://localhost:8001 and its postgres:16 on localhost:5441.
+# Payment and Access are separate repos; the defaults point at them on localhost:8002 and :8003.
 name: cowork-booking-purchase
 services:
   db:
     image: postgres:16
-    container_name: cowork-booking-purchase-db
     environment:
       POSTGRES_USER: cowork
       POSTGRES_PASSWORD: cowork
@@ -11,18 +12,39 @@ services:
       - "5441:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cowork -d cowork_purchase"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   app:
     build: .
     image: cowork-booking-purchase
-    container_name: cowork-booking-purchase-app
     environment:
-      APP_REVISION: compose
+      APP_REVISION: ${APP_REVISION:-compose}
       DATABASE_URL: postgresql://cowork:cowork@db:5432/cowork_purchase
+      SECRET_KEY: ${SECRET_KEY:-dev-purchase-secret-key-0123456789abcdef}
+      PUBLIC_URL: http://localhost:8001
+      PAYMENT_INTERNAL_URL: ${PAYMENT_INTERNAL_URL:-http://host.docker.internal:8002}
+      PAYMENT_PUBLIC_URL: ${PAYMENT_PUBLIC_URL:-http://localhost:8002}
+      PAYMENT_API_TOKEN: ${PAYMENT_API_TOKEN:-dev-payment-api-token-0123456789abcdef}
+      ACCESS_INTERNAL_URL: ${ACCESS_INTERNAL_URL:-http://host.docker.internal:8003}
+      ACCESS_PUBLIC_URL: ${ACCESS_PUBLIC_URL:-http://localhost:8003}
+      ACCESS_API_TOKEN: ${ACCESS_API_TOKEN:-dev-access-api-token-0123456789abcdef}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:-operator@example.com}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8001:8000"
     depends_on:
-      - db
+      db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 5s
 
 volumes:
   db-data:
