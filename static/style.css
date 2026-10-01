@@ -952,6 +952,7 @@ html:has(.sticky-bar) { scroll-padding-bottom: 200px; }
 @media (max-width: 419px) {
   .topnav-user { max-width: 120px; }
   .subnav .tabs a, .subnav .tabs button { font-size: 13px; }
+  .subnav .tabs a > [aria-hidden="true"] { display: none; }  /* the decorative ↗: the five tabs fit at 375 px */
 }
 /* Touch: every target at least 44px. */
 @media (pointer: coarse) {
