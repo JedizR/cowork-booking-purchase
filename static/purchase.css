@@ -57,13 +57,13 @@
 /* The bar shows the avatar and the display name only (the email is inside the menu); long names truncate. */
 .topnav-account .topnav-name { max-width: 180px; }
 @media (max-width: 640px) { .topnav-account .topnav-name { max-width: 120px; } }
-@media (max-width: 419px) { .topnav-account .topnav-name { max-width: 84px; } }
-/* Operator tabs on phones: they scroll sideways, and the right edge fades to say so. */
+@media (max-width: 419px) { .topnav-account .topnav-name { max-width: 96px; } .topnav-name-rest { display: none; } }
+/* Logged out the only link is Spaces: it stays in the first row, and on a phone the brand (home) stands for it. */
+@media (max-width: 833px) { .topnav-links.is-solo { order: 0; flex: none; padding: 0; margin: 0; } }
+@media (max-width: 640px) { .topnav-links.is-solo { display: none; } }
+/* Operator tabs: on a phone the five fit in one row (style.css), the current one scrolled into view on narrower screens. */
 .subnav .tabs a { gap: 6px; }
 .tab-count { min-width: 18px; height: 18px; font-size: 11px; }
-@media (max-width: 640px) {
-  .subnav .tabs { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); padding-right: 32px; }
-}
 
 /* ---- Spaces grid: one quiet cover style; capacity is the big number ---- */
 .space-grid { row-gap: var(--sp-6); }
@@ -227,6 +227,7 @@ a.slot[data-mine]:focus-visible .slot-body { outline: 2px solid var(--black); ou
 .operator-card .dl { font-size: var(--fs-caption); }
 .operator-card .dl dt, .operator-card .dl dd { padding-top: 9px; padding-bottom: 9px; }
 .operator-card .dl dt { padding-right: var(--sp-4); white-space: nowrap; }
+.operator-card .dl dd.mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }  /* an id never breaks at its hyphen */
 @media (max-width: 640px) {
   .status-card .card-footer > .btn, .status-card .card-footer > form { flex: 1 1 100%; }
   .status-card .card-footer > form .btn { width: 100%; }
@@ -298,8 +299,6 @@ a.slot[data-mine]:focus-visible .slot-body { outline: 2px solid var(--black); ou
 .table td.cell-wrap { white-space: normal; min-width: 150px; max-width: 200px; }
 .table td.cell-member { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
 .table td.cell-member .cell-sub { overflow: hidden; text-overflow: ellipsis; }
-.table .cell-title { font-weight: 600; text-decoration: none; }
-.table .cell-title:hover { text-decoration: underline; }
 .table .cell-state .badge + .cell-sub { margin-top: 4px; }
 .timeline .timeline-slots > .slot.is-preview:not(.is-selected):not(:disabled):hover .slot-body { background: var(--fill); }
 .table-foot { margin-top: var(--sp-3); }

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
-{% block title %}All bookings{% endblock %}
+{% block title %}Bookings{% endblock %}
 {% block subnav %}{{ ui.operator_nav("bookings") }}{% endblock %}
 {% macro url(s=status, w=when, query=q) %}/operator/bookings?{% if s != "all" %}status={{ s }}&amp;{% endif %}{% if w != "upcoming" %}when={{ w }}&amp;{% endif %}{% if query %}q={{ query|urlencode }}{% endif %}{% endmacro %}
 {% block content %}
   {% set flag_badges = {"being_prepared": ("Being prepared", "badge-outline"), "revocation_pending": ("Revocation pending", "badge-outline"), "refund_pending": ("Refund pending", "badge-outline"), "refund_failed": ("Refund failed", "badge-attention")} %}
   <header class="page-header">
     <div>
-      <h1 class="page-title">All bookings</h1>
+      <h1 class="page-title">Bookings</h1>
       <p class="page-subtitle">Rows that need a person come first, refunds owed oldest first, then by start time.</p>
     </div>
     {% if attention and attention.held %}
@@ -39,7 +39,7 @@
       {% call ui.empty("No bookings match", "Try another date range, status or search." if q or status != "all" else "Nothing in this date range. Try Any date.", "search") %}<a class="btn btn-secondary" href="/operator/bookings?when=any">Show every booking</a>{% endcall %}
     {% else %}
       <div class="table-wrap">
-        <table class="table table-stack ops-table">
+        <table class="table table-stack table-link ops-table">
           <thead><tr><th>Booking</th><th>When</th><th>Member</th><th>Status</th><th class="col-num">Money</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
           <tbody>
             {% for b in rows %}
@@ -64,7 +64,7 @@
                   {% endif %}
                 </td>
                 <td class="col-num cell-money">
-                  {%- if b.coverage == "plan" -%}<span class="muted">Plan · no charge</span><span class="cell-sub">List {{ b.agreed_price_satang|money }}</span>
+                  {%- if b.coverage == "plan" -%}<span class="muted">Plan · no charge</span><span class="cell-sub">Agreed {{ b.agreed_price_satang|money }}</span>
                   {%- elif b.coverage == "free" -%}<span class="muted">Free</span>
                   {%- else -%}{{ b.agreed_price_satang|money }}<span class="cell-sub">{{ ui.money_state(b) }}</span>{%- endif -%}
                 </td>

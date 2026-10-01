@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
-{% block title %}Spaces admin{% endblock %}
+{% block title %}Spaces{% endblock %}
 {% block subnav %}{{ ui.operator_nav("spaces") }}{% endblock %}
 {% block content %}
   <header class="page-header">
     <div>
-      <h1 class="page-title">Spaces admin</h1>
+      <h1 class="page-title">Spaces</h1>
       <p class="page-subtitle">The rooms members can book. A room is archived, never deleted, so its history stays.</p>
     </div>
     <div class="page-actions"><a class="btn btn-secondary" href="/operator/spaces#space-form">New space</a></div>

@@ -16,7 +16,7 @@
   {% macro line(icon="i") %}<div class="status-line"><span class="status-dot" aria-hidden="true">{{ icon }}</span><div class="status-text">{{ caller() }}</div></div>{% endmacro %}
 
   {% set ended = completed or b.status in ("expired", "cancelled") %}
-  <a class="back-link" href="{{ '/bookings/mine' if own else '/operator/bookings' }}">{{ "My bookings" if own else "All bookings" }}</a>
+  <a class="back-link" href="{{ '/bookings/mine' if own else '/operator/bookings' }}">{{ "My bookings" if own else "Bookings" }}</a>
   {# The state is said once: live bookings title it; ended ones title the room and leave the state to the status
      card, so a cancel reads as the flash plus one card. #}
   <header class="page-header booking-header">
@@ -186,7 +186,7 @@
             <dt>Coverage</dt><dd>{{ b.coverage|capitalize }}</dd>
             {% if b.cancelled_at %}<dt>Cancelled</dt><dd>{{ b.cancelled_at|at }}</dd>{% endif %}
             {% if b.refund_attempt %}<dt>Refund attempt</dt><dd class="num">{{ b.refund_attempt }} · {{ b.refund_status }}</dd>{% endif %}
-            {% if b.payment_session_id %}<dt>Payment session</dt><dd class="mono">{{ b.payment_session_id }}</dd>{% endif %}
+            {% if b.payment_session_id %}<dt>Payment session</dt><dd class="mono" title="{{ b.payment_session_id }}">{{ b.payment_session_id }}</dd>{% endif %}
           </dl>
         </section>
       {% endif %}

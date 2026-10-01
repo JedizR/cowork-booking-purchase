@@ -35,7 +35,7 @@
               </td>
               <td class="cell-role{% if not m.is_operator %} is-plain{% endif %}">{% if m.is_operator %}<span class="badge badge-solid">Operator</span>{% else %}<span class="muted">Member</span>{% endif %}</td>
               <td class="cell-joined"><span class="stack-label">Joined </span><span class="num">{{ m.created_at|fdate("full") }}</span></td>
-              <td class="col-num cell-upcoming">{% if m.upcoming %}<a href="/operator/bookings?q={{ m.email|urlencode }}">{{ m.upcoming }} upcoming</a>{% else %}<span class="muted">No upcoming</span>{% endif %}</td>
+              <td class="col-num cell-upcoming">{% if m.upcoming %}<a class="cell-title" href="/operator/bookings?q={{ m.email|urlencode }}">{{ m.upcoming }} upcoming</a>{% else %}<span class="muted">No upcoming</span>{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>

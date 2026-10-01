@@ -19,7 +19,7 @@
     <header class="topnav">
       <div class="topnav-inner">
         <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">C</span>Cowork Booking</a>
-        <nav class="topnav-links" aria-label="Main">
+        <nav class="topnav-links{% if not me %} is-solo{% endif %}" aria-label="Main">
           {{ nav("/", "Spaces", path == "/" or path.startswith("/spaces")) }}
           {% if me %}
             {{ nav("/bookings/mine", "My bookings", path.startswith("/bookings") and not operator_view) }}
@@ -29,10 +29,10 @@
                 <summary{% if in_op %} class="is-active"{% endif %}>Operator{% if attention and attention.flagged %} <span class="nav-count" title="Bookings that need a person">{{ attention.flagged }}</span>{% endif %}</summary>
                 <div class="topnav-menu-panel">
                   {{ nav("/dashboard", "Dashboard", path == "/dashboard") }}
-                  {{ nav("/operator/bookings", "All bookings", path == "/operator/bookings" or operator_view) }}
-                  {{ nav("/operator/spaces", "Spaces admin", path.startswith("/operator/spaces")) }}
+                  {{ nav("/operator/bookings", "Bookings", path == "/operator/bookings" or operator_view) }}
+                  {{ nav("/operator/spaces", "Spaces", path.startswith("/operator/spaces")) }}
                   {{ nav("/operator/members", "Members", path == "/operator/members") }}
-                  <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
+                  <a href="{{ payment_public_url }}/operator">Payments <span aria-hidden="true">↗</span></a>
                 </div>
               </details>
             {% endif %}
@@ -43,7 +43,7 @@
             {# The bar shows the avatar and display name; the menu says who is logged in with the email (PUR-R02),
                My bookings, and Log out as a POST (PUR-R37). #}
             <details class="topnav-menu topnav-account">
-              <summary class="topnav-user"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }}</span><span class="visually-hidden">, account menu</span></summary>
+              <summary class="topnav-user"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span>{% set nm = me.display_name.split(" ", 1) %}<span class="topnav-name">{{ nm[0] }}{% if nm|length > 1 %}<span class="topnav-name-rest"> {{ nm[1] }}</span>{% endif %}</span><span class="visually-hidden">, account menu</span></summary>
               <div class="topnav-menu-panel">
                 <p class="account-who"><strong>{{ me.display_name }}</strong><span>{{ me.email }}</span></p>
                 <a href="/bookings/mine">My bookings</a>

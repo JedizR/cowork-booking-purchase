@@ -49,7 +49,7 @@ def test_pur_r03_cookie_is_httponly_and_samesite_lax(app):
 def test_pur_r04_operator_promoted_by_operator_email(app):
     op = operator(app)
     assert op.get("/operator/bookings").status_code == 200
-    assert "Payment totals" in op.get("/").get_data(as_text=True)
+    assert "Payments <span" in op.get("/").get_data(as_text=True)  # the menu links Payment's operator page
 
 
 def test_pur_r05_anonymous_booking_goes_to_login_and_keeps_the_page(app):
