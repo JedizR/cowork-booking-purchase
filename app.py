@@ -847,7 +847,7 @@ def create_app(database_url: str | None = None) -> Flask:
         return render_template("booking.html", b=b, now=now, own=own, unknown=unknown,
                                deadline=deadline(b) if b["hold_expires_at"] else None,
                                seconds_left=int((deadline(b) - now).total_seconds())
-                               if b["hold_expires_at"] else 0,
+                               if b["hold_expires_at"] else 0, pay_window=int((HOLD - PAY_MARGIN).total_seconds()),
                                book_again=book_again_url(b, now), full_refund_by=b["start_at"] - timedelta(hours=24))
 
     def book_again_url(b, now) -> str:
@@ -892,7 +892,8 @@ def create_app(database_url: str | None = None) -> Flask:
         past = sorted((b for b in rows if b["end_at"] <= now), key=lambda b: b["start_at"], reverse=True)
         hold = own_hold(m["id"], now)
         return render_template("my_bookings.html", upcoming=upcoming, past=past, now=now, unknown=unknown,
-                               hold=hold, hold_text=held_message(hold, now) if hold else None)
+                               hold=hold, hold_text=held_message(hold, now) if hold else None,
+                               view="past" if request.args.get("view") == "past" else "upcoming")
 
     # --- cancel and retry ---
 

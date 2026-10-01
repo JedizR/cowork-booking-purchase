@@ -1,23 +1,72 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}My bookings{% endblock %}
 {% block content %}
-  <h1>My bookings</h1>
-  {% if hold %}<p class="message">{% if hold_text.startswith("Time to pay") %}{{ hold_text }}{% else %}You have a held booking {{ hold.reference }}, {{ hold.space_name }} {{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}. <a href="/bookings/{{ hold.reference }}">Open {{ hold.reference }}</a></p>{% endif %}
-  {% if not upcoming and not past %}<p>No bookings yet. <a href="/">Find a space</a></p>{% endif %}
-  {% macro row(b) %}
-    <li>
-      <a href="/bookings/{{ b.reference }}">{{ b.reference }}</a> {{ b.space_name }}, {{ b.start_at|local_time }}-{{ b.end_at|hhmm }},
-      {% if b.status == "confirmed" and now >= b.end_at %}Completed{% else %}{{ b.status }}{% endif %}
-      {% if b.status == "held" %}
-        {% if b.reference in unknown %}Payment status unknown
-        {% elif now >= b.hold_expires_at - pay_margin %}Time to pay has run out on {{ b.reference }}; cancel it, or try again from {{ b.hold_expires_at|hhmm }}
-        {% else %}Pay by {{ (b.hold_expires_at - pay_margin)|hhmm }}{% endif %}
-      {% elif b.status == "confirmed" %}
-        {% if b.grant_status == "issued" and b.ticket_url %}<a href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a>
-        {% elif b.grant_status == "pending" %}E-ticket being prepared{% endif %}
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">My bookings</h1>
+      <p class="page-subtitle">Your rooms, tickets and payments in one place.</p>
+    </div>
+    <div class="page-actions"><a class="btn btn-secondary" href="/">Book a room</a></div>
+  </header>
+  {% if hold %}
+    <div class="alert alert-strong hold-banner" role="status">
+      <span class="alert-icon" aria-hidden="true">!</span>
+      <p class="alert-title">{% if hold_text.startswith("Time to pay") %}{{ hold_text }}{% else %}You have a held booking {{ hold.reference }}, {{ hold.space_name }} {{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}.</p>
+      <div class="alert-actions"><a class="btn btn-primary" href="/bookings/{{ hold.reference }}">Open {{ hold.reference }}</a></div>
+    </div>
+  {% endif %}
+
+  {% if not upcoming and not past %}
+    {% call ui.empty("No bookings yet", "Your bookings and e-tickets will show here.") %}<a class="btn btn-primary" href="/">Find a space</a>{% endcall %}
+  {% else %}
+    <nav class="segmented bookings-tabs" aria-label="Bookings">
+      <a href="/bookings/mine"{% if view == "upcoming" %} aria-current="page"{% endif %}>Upcoming <span class="seg-count">{{ upcoming|length }}</span></a>
+      <a href="/bookings/mine?view=past"{% if view == "past" %} aria-current="page"{% endif %}>Past <span class="seg-count">{{ past|length }}</span></a>
+    </nav>
+    {% set rows = upcoming if view == "upcoming" else past %}
+    {% if not rows %}
+      {% if view == "upcoming" %}
+        {% call ui.empty("Nothing coming up", "Book a room and it shows here with its e-ticket.") %}<a class="btn btn-primary" href="/">Find a space</a>{% endcall %}
+      {% else %}
+        {% call ui.empty("No past bookings", "Bookings move here once they end.") %}{% endcall %}
       {% endif %}
-    </li>
-  {% endmacro %}
-  {% if upcoming %}<h2>Upcoming</h2><ul class="list">{% for b in upcoming %}{{ row(b) }}{% endfor %}</ul>{% endif %}
-  {% if past %}<h2>Past</h2><ul class="list">{% for b in past %}{{ row(b) }}{% endfor %}</ul>{% endif %}
+    {% else %}
+      <ul class="list bookings-list">
+        {% for b in rows %}
+          {% set ended = now >= b.end_at %}
+          <li class="list-item{% if ended or b.status in ('cancelled', 'expired') %} is-past{% endif %}">
+            <div class="date-tile" aria-hidden="true"><span class="date-tile-month">{{ b.start_at|fdate("mon") }}</span><span class="date-tile-day">{{ b.start_at|fdate("day") }}</span></div>
+            <div>
+              <p class="list-item-title"><a href="/bookings/{{ b.reference }}">{{ b.space_name }}</a></p>
+              <p class="list-item-meta">{{ "Today" if b.start_at|fdate("full") == now|fdate("full") else b.start_at|fdate }} · <span class="num">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span> · <span class="nowrap">{{ b.reference }}</span></p>
+            </div>
+            <div class="list-item-aside">
+              {% if b.status == "held" %}
+                {% if b.reference in unknown %}<span class="badge badge-attention">Payment status unknown</span>
+                {% elif now >= b.hold_expires_at - pay_margin %}<span class="list-item-note">Time to pay has run out on {{ b.reference }}; cancel it, or try again from {{ b.hold_expires_at|hhmm }}</span>
+                {% else %}<span class="badge badge-outline">Pay by {{ (b.hold_expires_at - pay_margin)|hhmm }}</span>{% endif %}
+                {% if now < b.hold_expires_at - pay_margin %}
+                  <form method="post" action="/spaces/{{ b.space_id }}/book">
+                    <input type="hidden" name="date" value="{{ (b.start_at|local_time)[:10] }}">
+                    <input type="hidden" name="start" value="{{ b.start_at|hhmm }}">
+                    <input type="hidden" name="blocks" value="{{ b.blocks }}">
+                    <input type="hidden" name="party_size" value="{{ b.party_size }}">
+                    <input type="hidden" name="note" value="{{ b.note or '' }}">
+                    <button class="btn btn-primary btn-utility" type="submit">Continue to payment</button>
+                  </form>
+                {% endif %}
+              {% elif b.status == "confirmed" %}
+                {{ ui.status_badge(b, now) }}
+                {% if b.grant_status == "issued" and b.ticket_url %}<a class="btn btn-utility" href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a>
+                {% elif b.grant_status == "pending" %}<span class="list-item-note">E-ticket being prepared</span>{% endif %}
+              {% else %}
+                {{ ui.status_badge(b, now) }}
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
 {% endblock %}
