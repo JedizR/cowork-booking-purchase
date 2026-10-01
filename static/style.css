@@ -708,7 +708,7 @@ a.chip:hover, button.chip:hover, label.chip:hover { border-color: var(--ink); te
   content: ""; position: absolute; inset: 3px 0 2px; border: 1px solid var(--fill-strong); border-radius: var(--r-sm); pointer-events: none;
 }
 .slot:not(:disabled):not(.is-selected):not(.is-booked):not(.is-unavailable):hover .slot-body,
-.slot:not(:disabled):not(.is-selected):focus-visible .slot-body { background: var(--parchment); }
+.slot:not(:disabled):not(.is-selected):not(.is-preview):focus-visible .slot-body { background: var(--parchment); }
 /* A press shows the pick at once (no wait for the click), and a tap never waits for a double-tap zoom. */
 .slot { touch-action: manipulation; }
 .slot:not(:disabled):not(.is-selected):active .slot-body { background: var(--ink); color: var(--on-dark); }
@@ -719,7 +719,7 @@ a.chip:hover, button.chip:hover, label.chip:hover { border-color: var(--ink); te
   font-size: var(--fs-caption); line-height: 1.2; pointer-events: none;
 }
 .slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview):hover::after,
-.slot[data-hint]:not(:disabled):not(.is-selected):focus-visible::after {
+.slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview):focus-visible::after {
   content: attr(data-hint); font-weight: 600; color: var(--ink);
 }
 .slot:focus-visible { outline: none; }
