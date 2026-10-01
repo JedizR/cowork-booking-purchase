@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Archive {{ space.name }}{% endblock %}
+{% block subnav %}{{ ui.operator_nav("spaces") }}{% endblock %}
+{% block width %} container-form{% endblock %}
+{% block content %}
+  <a class="back-link" href="/operator/spaces">Spaces admin</a>
+  <section class="card confirm-card">
+    <p class="eyebrow">Archive a room</p>
+    <h1 class="confirm-title">Archive {{ space.name }} (room {{ space.id }})?</h1>
+    {% if live %}
+      {# PUR-R16: archive waits until no held or confirmed booking ends after now. #}
+      <div class="summary confirm-summary">
+        <h2 class="summary-title">Cancel these first</h2>
+        <p class="confirm-refund is-long">{{ live|length }} {{ "booking" if live|length == 1 else "bookings" }} still {{ "uses" if live|length == 1 else "use" }} this room. A room can be archived only when no held or confirmed booking ends after now.</p>
+        <ul class="list archive-list">
+          {% for b in live %}
+            <li class="list-item">
+              <div class="date-tile" aria-hidden="true"><span class="date-tile-month">{{ b.start_at|fdate("mon") }}</span><span class="date-tile-day">{{ b.start_at|fdate("day") }}</span></div>
+              <div>
+                <p class="list-item-title"><a href="/bookings/{{ b.reference }}">{{ b.reference }}</a></p>
+                <p class="list-item-meta">{{ ui.when(b) }} · {{ b.member_name }}</p>
+              </div>
+              <div class="list-item-aside"><span class="badge {{ 'badge-outline' if b.status == 'held' else 'badge-solid' }}">{{ b.status|capitalize }}</span></div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="form-actions"><a class="btn btn-primary" href="/operator/bookings?q={{ space.name|urlencode }}">Open these bookings</a><a class="btn btn-secondary" href="/operator/spaces">Keep room</a></div>
+    {% else %}
+      <div class="summary confirm-summary">
+        <h2 class="summary-title">What happens</h2>
+        <ul class="consequences">
+          <li>Members no longer see the room and cannot book it.</li>
+          <li>Its past bookings and their history stay.</li>
+          <li>Archiving cannot be undone: the room cannot be edited or restored. Its name can be used for a new room.</li>
+        </ul>
+      </div>
+      <form method="post" action="/operator/spaces/{{ space.id }}/archive">
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Archive room</button>
+          <a class="btn btn-secondary" href="/operator/spaces">Keep room</a>
+        </div>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

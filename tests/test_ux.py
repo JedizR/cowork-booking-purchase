@@ -84,3 +84,76 @@ def test_operator_bookings_filter_and_search(app):
     assert "No bookings match" in op.get("/operator/bookings?q=BK-NONE").get_data(as_text=True)
     edit = op.get("/operator/spaces?edit=1").get_data(as_text=True)
     assert 'action="/operator/spaces/1"' in edit and 'value="Meeting Room A"' in edit
+
+
+def order(html):
+    return re.findall(r'data-booking-reference="(BK-[A-Z0-9]{6})"', html)
+
+
+def test_operator_list_puts_flagged_rows_first_and_not_settled_refunds(app, pay, axs):
+    """A refunded cancel no longer needs a person; a ticket still being prepared does (PUR-R32, DESIGN Tables)."""
+    op, a, b, c = (member(app, "operator@example.com", "Op"), member(app), member(app, "b@example.com", "B"),
+                   member(app, "c@example.com", "C"))
+    refunded = book_json(a).get_json()["reference"]
+    pay.pay(refunded)
+    a.get(f"/api/bookings/{refunded}")
+    assert a.post(f"/api/bookings/{refunded}/cancel", json={}).get_json()["refund_status"] == "succeeded"
+    plain = book_json(b, space_id=4, start="2026-10-07T12:00:00+07:00", party_size=1).get_json()["reference"]
+    axs.down = True
+    preparing = book_json(c, space_id=4, start="2026-10-08T09:00:00+07:00", party_size=1).get_json()["reference"]
+    rows = order(op.get("/operator/bookings?when=any").get_data(as_text=True))  # unflagged: newest start first
+    assert rows == [preparing, plain, refunded]
+    assert order(op.get("/operator/bookings?q=c@EXAMPLE.com").get_data(as_text=True)) == [preparing]  # by email
+
+
+def test_pur_r41_booking_page_shows_the_live_ticket_code(app, axs):
+    a = member(app)
+    ref = book_json(a, space_id=4, party_size=1).get_json()["reference"]
+    assert "M4TR-8WCE" in a.get(f"/bookings/{ref}").get_data(as_text=True)
+    axs.down = True
+    html = a.get(f"/bookings/{ref}").get_data(as_text=True)
+    assert "Ticket code unavailable right now" in html and "View e-ticket" in html and "M4TR-8WCE" not in html
+    axs.down = False
+    a.post(f"/api/bookings/{ref}/cancel", json={})
+    assert "M4TR-8WCE" not in a.get(f"/bookings/{ref}").get_data(as_text=True)
+
+
+def test_archive_asks_first_and_lists_what_blocks_it(app):
+    op, a = member(app, "operator@example.com", "Op"), member(app)
+    ref = book_json(a).get_json()["reference"]
+    html = op.get("/operator/spaces/1/archive").get_data(as_text=True)
+    assert ref in html and 'action="/operator/spaces/1/archive"' not in html  # blocked: no button (PUR-R16)
+    html = op.get("/operator/spaces/2/archive").get_data(as_text=True)
+    assert 'action="/operator/spaces/2/archive"' in html and "Archive room" in html
+    assert len(op.get("/api/spaces").get_json()["spaces"]) == 4  # the GET changed nothing (PUR-R37)
+    assert a.get("/operator/spaces/2/archive").status_code == 404
+
+
+def test_forms_keep_the_typed_email_never_the_password(app):
+    c = app.test_client()
+    c.post("/register", data={"email": "new@example.com", "display_name": "New", "password": "short"})
+    html = c.get("/register").get_data(as_text=True)
+    assert 'value="new@example.com"' in html and 'value="New"' in html and "short" not in html
+    c.post("/register", data={"email": "new@example.com", "display_name": "New", "password": "long-enough"})
+    assert 'value="new@example.com"' in c.get("/login").get_data(as_text=True)
+    c.post("/login", data={"email": "new@example.com", "password": "wrong-password"})
+    html = c.get("/login").get_data(as_text=True)
+    assert "Invalid email or password" in html and 'value="new@example.com"' in html
+    assert 'value=""' in c.get("/login").get_data(as_text=True)  # shown once, like the flash
+
+
+def test_my_bookings_upcoming_leaves_out_cancelled(app):
+    a = member(app)
+    ref = book_json(a, space_id=4, party_size=1).get_json()["reference"]
+    a.post(f"/api/bookings/{ref}/cancel", json={})
+    assert ref not in a.get("/bookings/mine").get_data(as_text=True)
+    assert ref in a.get("/bookings/mine?view=past").get_data(as_text=True)
+
+
+def test_add_to_calendar_reads_the_stored_booking(app):
+    a = member(app)
+    ref = book_json(a, space_id=4, party_size=1).get_json()["reference"]
+    r = a.get(f"/bookings/{ref}/calendar.ics")
+    body = r.get_data(as_text=True)
+    assert r.mimetype == "text/calendar" and "DTSTART:20261007T020000Z\r\n" in body and "DTEND:20261007T033000Z" in body
+    assert f"UID:{ref}@cowork-booking" in body and "SUMMARY:Community Table" in body
