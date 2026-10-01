@@ -5,27 +5,74 @@
 {% block content %}
   {% set total = status.values()|sum %}
   {% set hours_total = hours.values()|map("float")|sum %}
+  {% set a = attention %}
   <header class="page-header">
     <div>
       <h1 class="page-title">Dashboard</h1>
-      <p class="page-subtitle num">Last 7 Bangkok days, {{ period_from|fdate }} to {{ period_to|fdate }}. Bookings count by their start; a lapsed hold counts as held until reconciled.</p>
+      <p class="page-subtitle">What needs you now, who comes in next, and the last 7 days.</p>
     </div>
-    <form method="post" action="/operator/bookings/reconcile" class="page-actions"><input type="hidden" name="return_to" value="dashboard"><button class="btn btn-secondary" type="submit">Reconcile all held</button></form>
+    {% if a.held %}
+      <form method="post" action="/operator/bookings/reconcile" class="page-actions"><input type="hidden" name="return_to" value="dashboard"><button class="btn btn-secondary" type="submit">Reconcile all held <span class="btn-count">{{ a.held }}</span></button></form>
+    {% endif %}
   </header>
+
+  <div class="grid-2 dash-now">
+    {# Work first: the flag counts link to the rows (PUR-R32, PUR-R33). Counts only, no money (PUR-R34). #}
+    <section class="card attention-card{% if a.flagged or a.lapsed %} is-attention{% endif %}">
+      <div class="card-header"><h2 class="card-title">Needs attention</h2>{% if a.flagged %}<span class="card-meta num">{{ a.flagged }} {{ "booking" if a.flagged == 1 else "bookings" }}</span>{% endif %}</div>
+      {% if a.flagged or a.lapsed %}
+        <ul class="attention-list">
+          {% for key, label, href in (("refund_failed", "Refund failed", "/operator/bookings?status=flagged"), ("refund_pending", "Refund pending", "/operator/bookings?status=flagged"), ("revocation_pending", "Revocation pending", "/operator/bookings?status=flagged"), ("being_prepared", "E-ticket being prepared", "/operator/bookings?status=flagged"), ("lapsed", "Hold ended, not reconciled", "/operator/bookings?status=held&amp;when=any")) %}
+            {% if a[key] %}
+              <li><a href="{{ href }}"><span class="attention-label">{% if key == "refund_failed" %}<span class="badge badge-attention">{{ label }}</span>{% else %}{{ label }}{% endif %}</span><span class="attention-count num">{{ a[key] }}</span></a></li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="all-clear"><span class="status-dot" aria-hidden="true">{{ ui.glyph("check") }}</span><div><p class="status-lead">Nothing needs you right now</p><p class="caption muted">Refunds, tickets and holds are all settled.</p></div></div>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Coming up</h2><a class="card-meta" href="/operator/bookings">All bookings</a></div>
+      {% if coming %}
+        <ul class="agenda">
+          {% for b in coming %}
+            {% set day = ui.day_word(b.start_at, now) %}
+            {% if loop.first or day != ui.day_word(loop.previtem.start_at, now) %}<li class="agenda-day">{{ day }}</li>{% endif %}
+            <li class="agenda-row">
+              <a href="/bookings/{{ b.reference }}">
+                <span class="agenda-time num">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span>
+                <span class="agenda-what"><strong>{{ b.space_name }}</strong><span class="cell-sub">{{ b.member_name }} · {{ b.reference }}</span></span>
+                {% if b.status == "held" %}<span class="badge badge-outline">Held</span>{% elif now >= b.start_at %}<span class="badge badge-solid">Now</span>{% endif %}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="caption muted">No upcoming bookings. They show here as members book.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="section-header dash-period">
+    <h2 class="section-title">Last 7 days</h2>
+    <p class="caption muted num">{{ period_from|fdate }} to {{ period_to|fdate }} (Bangkok). Bookings count by their start; a lapsed hold counts as held until reconciled.</p>
+  </div>
   <div class="dash" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
        {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
        {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
     <div class="grid-4">
       <div class="stat">
-        <span class="stat-label">Bookings</span>
+        <span class="stat-label">Bookings started</span>
         <span class="stat-value">{{ total }}</span>
-        <span class="stat-meta num">{{ status.confirmed }} confirmed · {{ status.held }} held</span>
+        <span class="stat-meta num">{{ status.confirmed }} confirmed · {{ status.held }} held · {{ status.expired }} expired · {{ status.cancelled }} cancelled</span>
       </div>
       <div class="stat">
         <span class="stat-label">Utilization</span>
         <span class="stat-value">{{ '%.1f' % (utilization * 100) }}<small>%</small></span>
         <progress class="progress" max="100" value="{{ '%.1f' % (utilization * 100) }}">{{ '%.1f' % (utilization * 100) }}%</progress>
-        <span class="stat-meta">of open hours, 08:00 to 20:00</span>
+        <span class="stat-meta num">confirmed hours of {{ spaces }} {{ "room" if spaces == 1 else "rooms" }} × 12 h × 7 days</span>
       </div>
       <div class="stat">
         <span class="stat-label">Members who booked</span>
@@ -43,7 +90,7 @@
         <div class="card-header"><h2 class="card-title">Bookings by status</h2><span class="card-meta num">{{ total }} total</span></div>
         <ul class="bar-chart">
           {% for k in ("confirmed", "held", "expired", "cancelled") %}
-            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track"><span class="bar{% if k in ('expired', 'cancelled') %} bar-muted{% endif %}" style="--value: {{ (status[k] / total * 100) if total else 0 }}%"></span></span><span class="bar-value">{{ status[k] }}</span></li>
+            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track">{% if status[k] %}<span class="bar{% if k in ('expired', 'cancelled') %} bar-muted{% endif %}" style="--value: {{ status[k] / total * 100 }}%"></span>{% endif %}</span><span class="bar-value">{{ status[k] }}</span></li>
           {% endfor %}
         </ul>
       </section>
@@ -51,7 +98,7 @@
         <div class="card-header"><h2 class="card-title">Confirmed hours by coverage</h2><span class="card-meta num">{{ hours_total|hours }} h</span></div>
         <ul class="bar-chart">
           {% for k in ("pay", "plan", "free") %}
-            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track"><span class="bar" style="--value: {{ (hours[k]|float / hours_total * 100) if hours_total else 0 }}%"></span></span><span class="bar-value">{{ hours[k] }} h</span></li>
+            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track">{% if hours[k]|float %}<span class="bar" style="--value: {{ hours[k]|float / hours_total * 100 }}%"></span>{% endif %}</span><span class="bar-value">{{ hours[k] }} h</span></li>
           {% endfor %}
         </ul>
         <p class="fine dash-fine">Plan and free hours are not revenue. Money totals are on <a href="{{ payment_public_url }}/operator">Payment totals</a>.</p>

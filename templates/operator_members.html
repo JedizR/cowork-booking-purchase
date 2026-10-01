@@ -9,24 +9,37 @@
       <p class="page-subtitle">With a plan on, a member books without paying. Only bookings made after a change use it.</p>
     </div>
   </header>
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Plan</th></tr></thead>
-      <tbody>
-        {% for m in rows %}
-          <tr>
-            <td><strong>{{ m.display_name }}</strong><span class="cell-sub">{{ m.email }}</span></td>
-            <td>{% if m.is_operator %}<span class="badge badge-solid">Operator</span>{% else %}<span class="muted">Member</span>{% endif %}</td>
-            <td class="num">{{ m.created_at|fdate("full") }}</td>
-            <td>
-              <form method="post" action="/operator/members/{{ m.id }}/plan" data-member-email="{{ m.email }}" data-plan-active="{{ 'true' if m.plan_active else 'false' }}">
-                <input type="hidden" name="plan_active" value="{{ 'false' if m.plan_active else 'true' }}">
-                <button class="switch switch-btn" type="submit" role="switch" aria-checked="{{ 'true' if m.plan_active else 'false' }}" aria-label="Plan for {{ m.email }}" title="{{ 'Turn plan off' if m.plan_active else 'Turn plan on' }}"><span class="switch-track"></span><span class="switch-text">{{ "On" if m.plan_active else "Off" }}</span></button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="toolbar">
+    <p class="caption muted toolbar-note">{{ rows|length }} {{ "member" if rows|length == 1 else "members" }}{% if q %} matching “{{ q }}”{% endif %}</p>
+    <form class="toolbar-search" method="get" action="/operator/members" role="search">
+      <label class="visually-hidden" for="q">Search members</label>
+      <input class="search" id="q" name="q" type="search" value="{{ q }}" placeholder="Name or email" autocomplete="off">
+    </form>
   </div>
+  {% if not rows %}
+    {% call ui.empty("No members match", "Try another name or email.", "search") %}<a class="btn btn-secondary" href="/operator/members">Clear search</a>{% endcall %}
+  {% else %}
+    <div class="table-wrap">
+      <table class="table table-stack members-table">
+        <thead><tr><th>Member</th><th>Plan</th><th>Role</th><th>Joined</th><th class="col-num">Upcoming</th></tr></thead>
+        <tbody>
+          {% for m in rows %}
+            <tr>
+              <td><strong>{{ m.display_name }}</strong><span class="cell-sub">{{ m.email }}</span></td>
+              <td class="cell-plan">
+                <form method="post" action="/operator/members/{{ m.id }}/plan" data-member-email="{{ m.email }}" data-plan-active="{{ 'true' if m.plan_active else 'false' }}">
+                  <input type="hidden" name="plan_active" value="{{ 'false' if m.plan_active else 'true' }}">
+                  <button class="switch switch-btn" type="submit" role="switch" aria-checked="{{ 'true' if m.plan_active else 'false' }}" aria-label="Plan for {{ m.email }}" title="{{ 'Turn plan off' if m.plan_active else 'Turn plan on' }}"><span class="switch-track"></span><span class="switch-text">{{ "On" if m.plan_active else "Off" }}</span></button>
+                </form>
+                {% if m.plan_active and m.upcoming_plan %}<span class="cell-sub">Turning off keeps {{ m.upcoming_plan }} upcoming plan {{ "booking" if m.upcoming_plan == 1 else "bookings" }}</span>{% endif %}
+              </td>
+              <td class="cell-role{% if not m.is_operator %} is-plain{% endif %}">{% if m.is_operator %}<span class="badge badge-solid">Operator</span>{% else %}<span class="muted">Member</span>{% endif %}</td>
+              <td class="cell-joined"><span class="stack-label">Joined </span><span class="num">{{ m.created_at|fdate("full") }}</span></td>
+              <td class="col-num cell-upcoming">{% if m.upcoming %}<a href="/operator/bookings?q={{ m.email|urlencode }}">{{ m.upcoming }} upcoming</a>{% else %}<span class="muted">No upcoming</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
 {% endblock %}

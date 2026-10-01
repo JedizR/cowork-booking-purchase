@@ -8,25 +8,27 @@
       <h1 class="page-title">Spaces admin</h1>
       <p class="page-subtitle">The rooms members can book. A room is archived, never deleted, so its history stays.</p>
     </div>
-    {% if editing %}<div class="page-actions"><a class="btn btn-secondary" href="/operator/spaces">New space</a></div>{% endif %}
+    <div class="page-actions"><a class="btn btn-secondary" href="/operator/spaces#space-form">New space</a></div>
   </header>
   {% if not rows %}
-    {% call ui.empty("No spaces yet. Create one below.", "", "room") %}{% endcall %}
+    {% call ui.empty("No spaces yet", "Create the first room below; members can book it at once.", "room") %}{% endcall %}
   {% else %}
     <div class="table-wrap">
-      <table class="table">
-        <thead><tr><th>Space</th><th class="col-num">Capacity</th><th class="col-num">Rate</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+      <table class="table table-stack spaces-table">
+        <thead><tr><th>Space</th><th>Status</th><th class="col-num">Capacity</th><th class="col-num">Rate</th><th class="col-num">Upcoming</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
         <tbody>
           {% for s in rows %}
-            <tr{% if editing and editing.id == s.id %} class="is-editing"{% endif %}>
+            {% set is_editing = editing and editing.id == s.id %}
+            <tr{% if is_editing %} class="is-flagged is-editing"{% elif s.archived_at %} class="is-archived"{% endif %}>
               <td><strong>{{ s.name }}</strong><span class="cell-sub">Room {{ s.id }}</span></td>
-              <td class="col-num">{{ s.capacity }}</td>
+              <td class="cell-state">{% if is_editing %}<span class="badge badge-outline">Editing</span>{% elif s.archived_at %}<span class="badge badge-muted">Archived {{ s.archived_at|fdate("full") }}</span>{% else %}<span class="badge badge-solid">Bookable</span>{% endif %}</td>
+              <td class="col-num"><span class="stack-label">Up to </span>{{ s.capacity }}<span class="stack-label"> people</span></td>
               <td class="col-num">{% if s.hourly_rate_satang %}{{ s.hourly_rate_satang|money }} / h<span class="cell-sub">{{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min</span>{% else %}Free{% endif %}</td>
-              <td>{% if s.archived_at %}<span class="badge badge-muted">Archived {{ (s.archived_at|local_time)[:10] }}</span>{% else %}<span class="badge badge-solid">Bookable</span>{% endif %}</td>
+              <td class="col-num cell-upcoming">{% if s.archived_at %}<span class="muted">—</span>{% elif s.upcoming %}{{ s.upcoming }} upcoming{% else %}<span class="muted">No upcoming</span>{% endif %}</td>
               <td class="row-actions">
                 {% if not s.archived_at %}
-                  <a class="btn btn-utility" href="/operator/spaces?edit={{ s.id }}">Edit</a>
-                  <form method="post" action="/operator/spaces/{{ s.id }}/archive"><button class="btn btn-secondary btn-utility" type="submit">Archive</button></form>
+                  <a class="btn btn-secondary btn-utility" href="/operator/spaces?edit={{ s.id }}#space-form">Edit</a>
+                  <a class="btn btn-ghost btn-utility" href="/operator/spaces/{{ s.id }}/archive">Archive…</a>
                 {% endif %}
               </td>
             </tr>
@@ -52,10 +54,10 @@
       {% else %}
         <div class="card-header"><h2 class="card-title">Create a space</h2></div>
         <form method="post" action="/operator/spaces" class="stack stack-sm">
-          <div class="field"><label for="name">Name</label><input id="name" name="name" placeholder="Meeting Room A" required></div>
+          <div class="field"><label for="name">Name</label><input id="name" name="name" placeholder="e.g. Quiet Room" required></div>
           <div class="form-row">
-            <div class="field"><label for="capacity">Capacity</label><input id="capacity" type="number" name="capacity" min="1" max="1000" inputmode="numeric" required></div>
-            <div class="field"><label for="hourly_rate">THB per hour</label><input id="hourly_rate" type="number" name="hourly_rate" min="0" max="10000" inputmode="numeric" required></div>
+            <div class="field"><label for="capacity">Capacity</label><input id="capacity" type="number" name="capacity" min="1" max="1000" inputmode="numeric" placeholder="1 to 1,000" required></div>
+            <div class="field"><label for="hourly_rate">THB per hour</label><input id="hourly_rate" type="number" name="hourly_rate" min="0" max="10000" inputmode="numeric" placeholder="0 = free" required></div>
           </div>
           <p class="help">Capacity 1 to 1,000 people. Rate 0 (free) or 20 to 10,000 THB per hour, in whole baht.</p>
           <div class="form-actions"><button class="btn btn-primary" type="submit">Create</button></div>
