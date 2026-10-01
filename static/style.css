@@ -707,9 +707,15 @@ a.chip:hover, button.chip:hover, label.chip:hover { border-color: var(--ink); te
   content: ""; position: absolute; inset: 3px 0 2px; border: 1px solid var(--hairline); border-radius: var(--r-sm); pointer-events: none;
 }
 .slot:not(:disabled):not(.is-selected):not(.is-booked):not(.is-unavailable):hover .slot-body { background: var(--parchment); }
-.slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview):hover .slot-body::after,
-.slot[data-hint]:not(:disabled):not(.is-selected):focus-visible .slot-body::after {
-  content: attr(data-hint); font-size: var(--fs-caption); font-weight: 600; color: var(--ink);
+/* The hint sits on the button itself: attr() reads the element that owns the pseudo-element, and data-hint is on .slot. */
+.slot { position: relative; }
+.slot::after {
+  position: absolute; top: 0; bottom: 0; left: calc(var(--gutter-w) + var(--sp-4)); display: flex; align-items: center;
+  font-size: var(--fs-caption); line-height: 1.2; pointer-events: none;
+}
+.slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview):hover::after,
+.slot[data-hint]:not(:disabled):not(.is-selected):focus-visible::after {
+  content: attr(data-hint); font-weight: 600; color: var(--ink);
 }
 .slot:focus-visible { outline: none; }
 .slot:focus-visible .slot-body { outline: 2px solid var(--black); outline-offset: -2px; border-radius: var(--r-sm); }
@@ -720,7 +726,7 @@ a.chip:hover, button.chip:hover, label.chip:hover { border-color: var(--ink); te
   background-size: 8px 8px; background-origin: border-box;   /* rows are 40 / 48 px: the stripes run on across rows */
 }
 /* unavailable for another reason ("Too soon"): dotted, so it differs from free (outlined), booked (hatched) and the preview (flat grey) */
-.slot.is-unavailable .slot-body, .legend-swatch.is-unavailable { background: var(--parchment) radial-gradient(var(--field-border) 0.9px, transparent 1.3px) 0 0 / 6px 6px; color: var(--muted); }
+.slot.is-unavailable .slot-body, .legend-swatch.is-unavailable { background: var(--parchment) radial-gradient(var(--field-border) 0.8px, transparent 1.2px) 0 0 / 8px 8px; color: var(--muted); }
 .timeline-slots > .slot.is-unavailable .slot-time { color: var(--muted-48); font-weight: 400; }
 .slot:disabled, .slot.is-booked, .slot.is-unavailable { cursor: not-allowed; }
 a.slot.is-booked, a.slot.is-unavailable { pointer-events: none; }
@@ -941,9 +947,7 @@ a.slot.is-booked, a.slot.is-unavailable { pointer-events: none; }
   .segmented span, .segmented a { min-height: var(--h-control); }
   .cal-nav .btn-icon { width: 44px; height: 44px; min-height: 44px; }
   /* No hover on touch: every free row says what a tap does ("Start 09:30", then "End 11:00"). */
-  .slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview) .slot-body::after {
-    content: attr(data-hint); font-size: var(--fs-caption); font-weight: 400; color: var(--muted);
-  }
+  .slot[data-hint]:not(:disabled):not(.is-selected):not(.is-preview)::after { content: attr(data-hint); color: var(--muted); }
 }
 
 /* --------------------------------------------------------------------------
