@@ -749,12 +749,14 @@ def create_app(database_url: str | None = None) -> Flask:
         me = g.member
         coverage = "free" if price == 0 else "plan" if me and me["plan_active"] else "pay"
         hold = own_hold(me["id"], now) if me else None
-        starts = grid(day, blocks, now, busy_ranges(space_id, day, now))
+        busy = busy_ranges(space_id, day, now)
+        min_day, max_day = today(now), today(now) + timedelta(days=30)
         return render_template("space.html", space=space, day=day, blocks=blocks, price=price,
-                               coverage=coverage, starts=starts, hold=hold, now=now,
+                               coverage=coverage, starts=grid(day, blocks, now, busy), hold=hold, now=now,
+                               slots=grid(day, 1, now, busy),  # the timeline: one row per 30-min block
+                               cal=month(day, now), strip=[min_day + timedelta(days=i) for i in range(31)],
                                hold_text=held_message(hold, now) if hold else None,
-                               min_day=today(now), max_day=today(now) + timedelta(days=30),
-                               soon=day <= today(now) + timedelta(days=1))
+                               min_day=min_day, max_day=max_day, soon=day <= today(now) + timedelta(days=1))
 
     @app.get("/api/spaces")
     def api_spaces():

@@ -1,39 +1,178 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ space.name }}{% endblock %}
-{% block content %}
-  <h1>{{ space.name }}</h1>
-  <p>Up to {{ space.capacity }} people. {{ space.hourly_rate_satang|money }} per hour.</p>
-  {% if hold %}<p class="message">{% if hold_text.startswith("Time to pay") %}{{ hold_text }}{% else %}You have a held booking {{ hold.reference }}, {{ hold.space_name }} {{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}. <a href="/bookings/{{ hold.reference }}">Open {{ hold.reference }}</a></p>{% endif %}
-  <form method="get" action="/spaces/{{ space.id }}">
-    <label>Date <input type="date" name="date" value="{{ day }}" min="{{ min_day }}" max="{{ max_day }}" onchange="this.form.submit()"></label>
-    <label>Duration <select name="blocks" onchange="this.form.submit()">
-      {% for n in range(1, 9) %}<option value="{{ n }}" {% if n == blocks %}selected{% endif %}>{{ n|duration }}</option>{% endfor %}
-    </select></label>
-    <button type="submit">Show starts</button>
-  </form>
-  <form method="post" action="/spaces/{{ space.id }}/book" class="booking-form">
-    <input type="hidden" name="date" value="{{ day }}">
-    <input type="hidden" name="blocks" value="{{ blocks }}">
-    <div class="grid">
-      {% for s in starts %}
-        {% if s.available %}
-          <label><input type="radio" name="start" value="{{ s.start|hhmm }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }}</label>
-        {% else %}
-          <label title="{{ s.reason }}" class="greyed"><input type="radio" name="start" value="{{ s.start|hhmm }}" disabled title="{{ s.reason }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }} ({{ s.reason }})</label>
-        {% endif %}
-      {% endfor %}
+{% macro day_url(d) %}/spaces/{{ space.id }}?date={{ d.isoformat() }}{% if blocks != 1 %}&amp;blocks={{ blocks }}{% endif %}{% endmacro %}
+{% block page %}
+  {% set free_slots = slots|selectattr("available")|list %}
+  {% set half = (space.hourly_rate_satang + 1) // 2 %}
+  {% set next_day = strip[strip.index(day) + 1] if day != max_day else None %}
+  <div class="container">
+    {{ ui.flashes() }}
+    <a class="back-link" href="/">All spaces</a>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Room {{ space.id }}</p>
+        <h1 class="page-title">{{ space.name }}</h1>
+        <div class="chip-row space-facts">
+          <span class="chip chip-muted">Up to {{ space.capacity }} people</span>
+          {% if coverage == "free" %}<span class="chip chip-muted">Free</span>
+          {% else %}<span class="chip chip-muted num">{{ space.hourly_rate_satang|money }} per hour</span><span class="chip chip-muted num">{{ half|money }} per 30 min</span>{% endif %}
+          {% if coverage == "plan" %}<span class="chip chip-muted">Covered by your plan</span>{% endif %}
+        </div>
+      </div>
+    </header>
+    {% if hold %}
+      <div class="alert alert-strong hold-banner" role="status">
+        <span class="alert-icon" aria-hidden="true">!</span>
+        <p class="alert-title">{% if hold_text.startswith("Time to pay") %}{{ hold_text }}{% else %}You have a held booking {{ hold.reference }}, {{ hold.space_name }} {{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}.</p>
+        <p class="alert-body">One held booking at a time. Pay for it or cancel it to book another time.</p>
+        <div class="alert-actions"><a class="btn btn-primary" href="/bookings/{{ hold.reference }}">Open {{ hold.reference }}</a></div>
+      </div>
+    {% endif %}
+    <noscript>
+      <form class="card noscript-duration" method="get" action="/spaces/{{ space.id }}">
+        <input type="hidden" name="date" value="{{ day }}">
+        <div class="field">
+          <label for="ns-blocks">Duration</label>
+          <select id="ns-blocks" name="blocks">{% for n in range(1, 9) %}<option value="{{ n }}"{% if n == blocks %} selected{% endif %}>{{ n|duration }}</option>{% endfor %}</select>
+        </div>
+        <button class="btn btn-secondary" type="submit">Show starts</button>
+      </form>
+    </noscript>
+  </div>
+
+  <form method="post" action="/spaces/{{ space.id }}/book" class="book-form" id="book"
+        data-rate="{{ space.hourly_rate_satang }}" data-coverage="{{ coverage }}" data-anon="{{ 0 if me else 1 }}"
+        data-day="{{ day|fdate }}">
+    <div class="container">
+      <div class="picker">
+        <div class="picker-date">
+          <div class="card cal-card">
+            <div class="cal">
+              <div class="cal-header">
+                <h2 class="cal-title">{{ cal.first|fdate("month") }}</h2>
+                <div class="cal-nav">
+                  {% if cal.prev %}<a class="btn btn-icon" href="{{ day_url(cal.prev) }}" aria-label="Previous month">‹</a>
+                  {% else %}<span class="btn btn-icon is-disabled" aria-hidden="true">‹</span>{% endif %}
+                  {% if cal.next %}<a class="btn btn-icon" href="{{ day_url(cal.next) }}" aria-label="Next month">›</a>
+                  {% else %}<span class="btn btn-icon is-disabled" aria-hidden="true">›</span>{% endif %}
+                </div>
+              </div>
+              <div class="cal-grid">
+                {% for d in ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su") %}<span class="cal-dow" aria-hidden="true">{{ d }}</span>{% endfor %}
+                {% for c in cal.days %}
+                  {% if not c %}<span class="cal-day is-outside" aria-hidden="true"></span>
+                  {% elif c.bookable %}<a class="cal-day{% if c.date == min_day %} is-today{% endif %}{% if c.date == day %} is-selected{% endif %}" href="{{ day_url(c.date) }}" aria-label="{{ c.date|fdate('long') }}{% if c.date == min_day %}, today{% endif %}"{% if c.date == day %} aria-current="date"{% endif %}>{{ c.date.day }}</a>
+                  {% else %}<span class="cal-day is-disabled" aria-disabled="true">{{ c.date.day }}</span>{% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            <p class="fine cal-foot">Book from today up to 30 days ahead.</p>
+          </div>
+          <nav class="date-strip" aria-label="Choose a date">
+            {% for d in strip %}
+              <a class="date-chip{% if d == day %} is-selected{% endif %}" href="{{ day_url(d) }}"{% if d == day %} aria-current="date"{% endif %} aria-label="{{ d|fdate('long') }}">
+                <span class="date-chip-dow">{{ "Today" if d == min_day else d|fdate("dow") }}</span>
+                <span class="date-chip-day">{{ d.day }}</span>
+                <span class="date-chip-mon">{{ d|fdate("mon") }}</span>
+              </a>
+            {% endfor %}
+          </nav>
+        </div>
+
+        <div class="picker-time">
+          {% if free_slots %}
+            <div class="timeline" id="timeline" role="group" aria-labelledby="tl-title" data-default-blocks="{{ blocks }}">
+              <div class="timeline-head">
+                <h2 class="timeline-title" id="tl-title">{{ day|fdate("long") }}</h2>
+                <p class="timeline-hint">Select a start, then an end · 30 min to 4 h</p>
+              </div>
+              <div class="timeline-slots">
+                {% for s in slots %}
+                  {% set t, e = s.start|hhmm, s.end|hhmm %}
+                  {% if s.available %}
+                    <button type="button" class="slot" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" aria-pressed="false" aria-label="{{ t }} to {{ e }}, free"><span class="slot-time">{{ t }}</span><span class="slot-body"></span></button>
+                  {% else %}
+                    <button type="button" class="slot {{ 'is-booked' if s.reason == 'Booked' else 'is-unavailable' }}" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" disabled aria-label="{{ t }} to {{ e }}, {{ s.reason|lower }}"><span class="slot-time">{{ t }}</span><span class="slot-body"><span class="slot-reason">{{ s.reason }}</span></span></button>
+                  {% endif %}
+                {% endfor %}
+                <div class="timeline-end" aria-hidden="true"><span class="slot-time">20:00</span><span class="slot-body"></span></div>
+              </div>
+            </div>
+            <div class="timeline-legend" aria-hidden="true">
+              <span class="legend-item"><i class="legend-swatch"></i>Free</span>
+              <span class="legend-item"><i class="legend-swatch is-selected"></i>Your time</span>
+              <span class="legend-item"><i class="legend-swatch is-booked"></i>Booked</span>
+              <span class="legend-item"><i class="legend-swatch is-unavailable"></i>Too soon</span>
+            </div>
+          {% else %}
+            <h2 class="timeline-title timeline-title-solo">{{ day|fdate("long") }}</h2>
+            {% call ui.empty("No free time on this date", "Every half hour is booked or too soon. Try another date.") %}
+              {% if next_day %}<a class="btn btn-secondary" href="{{ day_url(next_day) }}">{{ next_day|fdate }}</a>{% endif %}
+            {% endcall %}
+          {% endif %}
+          <noscript>
+            <div class="card noscript-starts">
+              <h3 class="card-title">Starts for {{ blocks|duration }}</h3>
+              <div class="chip-row">
+                {% for s in starts %}
+                  {% if s.available %}
+                    <label class="chip"><input type="radio" name="start" value="{{ s.start|hhmm }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }}</label>
+                  {% else %}
+                    <label class="chip" title="{{ s.reason }}"><input type="radio" name="start" value="{{ s.start|hhmm }}" disabled title="{{ s.reason }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }} ({{ s.reason }})</label>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              {% if not starts|selectattr("available")|list %}<p class="help">No free start on this date. Try another date or a shorter duration.</p>{% endif %}
+            </div>
+          </noscript>
+        </div>
+
+        <div class="card picker-details stack stack-sm">
+          <h2 class="card-title">Details</h2>
+          <div class="field">
+            <span class="label" id="party-label">Party size</span>
+            <div class="stepper" role="group" aria-labelledby="party-label" data-stepper>
+              <button class="stepper-btn" type="button" data-step="-1" aria-label="Fewer people">−</button>
+              <input type="number" name="party_size" id="party_size" value="1" min="1" max="{{ space.capacity }}" inputmode="numeric" aria-label="Party size" required>
+              <button class="stepper-btn" type="button" data-step="1" aria-label="More people">+</button>
+            </div>
+            <p class="help">You book the whole room, for 1 to {{ space.capacity }} {{ "person" if space.capacity == 1 else "people" }}.</p>
+          </div>
+          <div class="field">
+            <label for="note">Note <span class="optional">· optional</span></label>
+            <textarea id="note" name="note" maxlength="500" rows="2" placeholder="Anything the operator should know"></textarea>
+          </div>
+          <div class="policy">
+            {% if coverage == "pay" %}
+              <p class="policy-title">Cancellation</p>
+              <p class="help">Full refund if you cancel 24 h or more before the start; after that, no refund.{% if soon %} Starts less than 24 h away cannot be refunded.{% endif %}</p>
+            {% elif coverage == "plan" %}
+              <p class="policy-title">Covered by your plan</p>
+              <p class="help">No payment needed. You can cancel until the start.</p>
+            {% else %}
+              <p class="policy-title">This space is free</p>
+              <p class="help">No payment needed. You can cancel until the start.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
     </div>
-    {% if not starts|selectattr("available")|list %}<p>No free start on this date. Try another date or a shorter duration.</p>{% endif %}
-    <label>Party size <input type="number" name="party_size" min="1" max="{{ space.capacity }}" value="1" required></label>
-    <label>Note <input name="note" maxlength="500" placeholder="Optional"></label>
-    {% if coverage == "plan" %}
-      <p>{{ space.name }}, {{ day }}, {{ blocks|duration }}: {{ price|money }}, covered by your plan. No payment needed.</p>
-    {% else %}
-      <p>{{ space.name }}, {{ day }}, {{ blocks|duration }}: {{ price|money }}</p>
-    {% endif %}
-    {% if coverage == "pay" %}
-      <p class="hint">Full refund if you cancel 24 h or more before the start; after that, no refund.{% if soon %} Starts less than 24 h away cannot be refunded.{% endif %}</p>
-    {% endif %}
-    <button type="submit">{% if not me %}Log in to book{% elif coverage == "pay" %}Continue to payment{% else %}Book{% endif %}</button>
+
+    <input type="hidden" name="date" value="{{ day }}">
+    <input type="hidden" name="start" value="" disabled>
+    <input type="hidden" name="blocks" value="{{ blocks }}">
+    <div class="sticky-bar">
+      <div class="sticky-bar-inner">
+        <div class="sticky-bar-summary" aria-live="polite">
+          <span class="sticky-bar-title" id="bar-title">Choose a time</span>
+          <span class="sticky-bar-meta" id="bar-meta">{% if coverage == "free" %}Free · no payment{% elif coverage == "plan" %}{{ half|money }} per 30 min · covered by your plan{% else %}{{ half|money }} per 30 min{% endif %}</span>
+          <span class="sticky-bar-hint" id="range-hint" hidden></span>
+        </div>
+        <div class="sticky-bar-actions">
+          <button class="btn btn-primary btn-lg" type="submit" id="bar-btn">{% if not me %}Log in to book{% elif coverage == "pay" %}Continue to payment{% else %}Book{% endif %}</button>
+        </div>
+      </div>
+    </div>
   </form>
 {% endblock %}
