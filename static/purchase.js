@@ -257,6 +257,7 @@
       if (start !== null) paint();
     });
     root.addEventListener("pointerleave", function () { hover = null; if (start !== null) paint(); });
+    root.addEventListener("touchstart", function () {}, { passive: true });  // iOS applies :active (the pressed fill) only with one
     root.addEventListener("focusin", function (e) {
       var el = e.target.closest(".slot");
       if (el && start !== null) { hover = +el.dataset.i; paint(); }
