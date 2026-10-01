@@ -4,8 +4,6 @@
 .skip-link { position: absolute; left: -9999px; top: 8px; z-index: 100; padding: 8px 16px; border-radius: var(--r-pill); background: var(--canvas); color: var(--ink); }
 .skip-link:focus { left: 16px; }
 .btn svg { width: 18px; height: 18px; flex: none; }
-.text-link { font-size: var(--fs-callout); color: var(--ink-80); }
-.text-link:hover { color: var(--ink); }
 
 /* ---- Top nav: Operator menu with the attention count, account menu, Sign up pill ---- */
 .topnav-menu { position: relative; flex: none; }
@@ -183,16 +181,9 @@
 
 /* ---- Booking page ---- */
 .booking-header { margin-bottom: var(--sp-5); }
-.booking-eyebrow { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
-.booking-eyebrow .badge { text-transform: none; letter-spacing: 0.01em; }
 .booking-steps { margin-bottom: var(--sp-6); display: flex; }
 .booking-steps li { flex: 1 1 0; min-width: 0; }
 .booking-steps li:last-child { flex: none; padding-right: 0; }
-.steps li.is-ended { color: var(--ink); }
-.steps li.is-ended::before {
-  border-color: var(--fill-strong);
-  background: var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.5 8.5l7 7M15.5 8.5l-7 7' stroke='%23333336' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/24px no-repeat;
-}
 .status-line { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; gap: var(--sp-3); }
 .status-line + .status-line, .stack-sm + .status-line, .status-line + .ticket-strip { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--divider-soft); }
 .status-line-action { align-items: center; }
@@ -214,6 +205,9 @@
 .ticket-strip-code { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: 0.05em; white-space: nowrap; }
 .status-line.is-attention .status-dot { background: var(--ink); color: var(--on-dark); border: 0; }
 .summary-coverage { margin: var(--sp-3) 0 0; font-size: var(--fs-caption); color: var(--muted); }
+/* Plan and free: what it costs the member is the headline; the agreed price is a footnote, never a "Total". */
+.summary-lead { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+.summary-lead + .summary-coverage { margin-top: var(--sp-1); }
 .summary-refund { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--fill-strong); }
 .summary .caption { margin: 0; color: var(--ink-80); }
 .booking-aside { position: sticky; top: var(--sp-5); }
@@ -223,7 +217,6 @@
 @media (max-width: 640px) {
   .status-card .card-footer > .btn, .status-card .card-footer > form { flex: 1 1 100%; }
   .status-card .card-footer > form .btn { width: 100%; }
-  .status-card .card-footer > .text-link { flex: 1 1 100%; text-align: center; }
   .ticket-strip { padding: var(--sp-4); }
   .ticket-strip .btn { flex: 1 1 100%; }
   .booking-steps li:last-child { padding-right: 0; }

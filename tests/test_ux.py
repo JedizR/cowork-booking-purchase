@@ -181,6 +181,18 @@ def test_times_read_one_way_on_the_cancel_screen_and_the_booking_page(app, pay):
     assert "Mon 5 Oct, 11:30" in words(op.get("/operator/bookings?when=any").get_data(as_text=True))
 
 
+def test_cancelled_page_says_cancelled_once_and_plan_is_never_a_total(app, pay):
+    a, b = member(app), member(app, "b@example.com", "B")
+    ref = book_json(a, space_id=4, party_size=1).get_json()["reference"]  # free: confirmed at once
+    page = words(a.post(f"/bookings/{ref}/cancel", data={"shown_refund_satang": "0"}, follow_redirects=True)
+                 .get_data(as_text=True))
+    assert page.count("Cancelled") == 1 and "Booking cancelled" in page  # the card line, plus the flash
+    app.db.execute("UPDATE members SET plan_active = true WHERE email = 'b@example.com'")
+    ref = book_json(b, party_size=2).get_json()["reference"]
+    page = words(b.get(f"/bookings/{ref}").get_data(as_text=True))
+    assert "Covered by your plan · no payment" in page and "Total" not in page and "You pay" not in page
+
+
 def test_pur_r34_dashboard_leads_with_today_and_coming_up(app):
     op, a = member(app, "operator@example.com", "Op"), member(app)
     html = words(op.get("/dashboard").get_data(as_text=True))

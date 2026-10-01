@@ -15,28 +15,23 @@
   {% macro reconcile() %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile" class="inline"><input type="hidden" name="return_to" value="booking"><button class="btn btn-ghost btn-utility" type="submit">Reconcile</button></form>{% endmacro %}
   {% macro line(icon="i") %}<div class="status-line"><span class="status-dot" aria-hidden="true">{{ icon }}</span><div class="status-text">{{ caller() }}</div></div>{% endmacro %}
 
+  {% set ended = completed or b.status in ("expired", "cancelled") %}
   <a class="back-link" href="{{ '/bookings/mine' if own else '/operator/bookings' }}">{{ "My bookings" if own else "All bookings" }}</a>
+  {# The state is said once: live bookings title it; ended ones title the room and leave the state to the status
+     card, so a cancel reads as the flash plus one card. #}
   <header class="page-header booking-header">
     <div>
-      <p class="eyebrow booking-eyebrow"><span>{{ b.reference }}</span>{{ ui.status_badge(b, now, unknown) }}</p>
+      <p class="eyebrow">{{ b.reference }}</p>
       <h1 class="page-title">
-        {%- if b.status == "held" -%}{% if not after %}Finish paying by {{ deadline|hhmm }}{% elif unknown %}Payment status unknown{% else %}Payment window closed{% endif %}
-        {%- elif completed -%}Completed
-        {%- elif b.status == "confirmed" -%}{{ "You’re booked." if own else "Confirmed booking" }}
-        {%- elif b.status == "expired" -%}Hold expired
-        {%- elif b.payment_status == "unpaid" -%}Hold cancelled
-        {%- elif not pay -%}Booking cancelled
-        {%- elif b.refund_status == "succeeded" -%}Cancelled and refunded
-        {%- elif b.refund_status == "pending" -%}Cancelled, refund pending
-        {%- elif b.refund_status == "failed" -%}Cancelled, refund failed
-        {%- elif b.refund_amount_satang == 0 -%}Cancelled, no refund
-        {%- else -%}Booking cancelled{%- endif -%}
+        {%- if ended -%}{{ b.space_name }}
+        {%- elif b.status == "held" -%}{% if not after %}Finish paying by {{ deadline|hhmm }}{% elif unknown %}Payment status unknown{% else %}Payment window closed{% endif %}
+        {%- else -%}{{ "You’re booked." if own else "Confirmed booking" }}{%- endif -%}
       </h1>
-      <p class="page-subtitle">{{ b.space_name }} · {{ b.start_at|fdate("long") }} · <span class="num nowrap">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span></p>
+      <p class="page-subtitle meta">{% if not ended %}<span>{{ b.space_name }}</span>{% endif %}<span class="nowrap">{{ b.start_at|fdate }}</span>{{ ui.times(b) }}</p>
     </div>
   </header>
 
-  {# The tracker shows only while something is still moving: paying, the ticket, or a cancel's revoke and refund. #}
+  {# The tracker shows only while something is still moving toward the ticket: paying, or the ticket itself. #}
   {% set steps = [] %}
   {% if b.status == "held" %}
     {% set _ = steps.append(("Reserved", "Held for you", "is-done")) %}
@@ -46,10 +41,6 @@
     {% if pay %}{% set _ = steps.append(("Reserved", "", "is-done")) %}{% set _ = steps.append(("Paid", "By card", "is-done")) %}{% endif %}
     {% set _ = steps.append(("Confirmed", "" if pay else ("Covered by " ~ whose ~ " plan" if b.coverage == "plan" else "Free"), "is-done")) %}
     {% set _ = steps.append(("Ticket", "Preparing", "is-current")) %}
-  {% elif b.status == "cancelled" and (b.grant_status == "revoke_pending" or b.refund_status in ("pending", "failed")) %}
-    {% set _ = steps.append(("Cancelled", b.cancelled_at|fdate ~ ", " ~ b.cancelled_at|hhmm if b.cancelled_at else "", "is-done")) %}
-    {% set _ = steps.append(("Ticket cancelled", "Pending" if b.grant_status == "revoke_pending" else "", "is-current" if b.grant_status == "revoke_pending" else "is-done")) %}
-    {% if b.refund_status in ("pending", "failed") %}{% set _ = steps.append(("Refunded", "Failed" if b.refund_status == "failed" else "Pending", "is-ended" if b.refund_status == "failed" else ("" if b.grant_status == "revoke_pending" else "is-current"))) %}{% endif %}
   {% endif %}
   {% if steps %}
     <ol class="steps booking-steps">
@@ -138,15 +129,16 @@
 
         {% else %}
           {% if b.status == "expired" %}
-            {% call line() %}{% if b.refund_reason == "slot_unavailable" %}Paid after the hold ended.{% else %}Not paid in time. The hold ended at {{ b.hold_expires_at|hhmm }} and nothing was charged.{% endif %}{% endcall %}
+            {% call line() %}<strong>{% if b.refund_reason == "slot_unavailable" %}Paid after the hold ended.{% else %}Not paid in time. The hold ended at {{ b.hold_expires_at|hhmm }} and nothing was charged.{% endif %}</strong>{% endcall %}
           {% else %}
             {% set while_held = b.payment_status == "unpaid" %}
-            {% call line("×") %}
+            {% call line("×") %}<strong>
               {%- if b.cancel_reason == "amount_mismatch" %}Cancelled: the payment did not match.
               {%- elif while_held and b.cancel_reason == "operator_cancel" %}Cancelled by the operator before payment. Nothing was charged.
               {%- elif while_held %}Cancelled before payment. Nothing was charged.
               {%- elif b.cancel_reason == "operator_cancel" %}Cancelled by the operator.
               {%- else %}Cancelled.{% endif -%}
+              </strong>{% if b.cancelled_at %}<br><span class="muted">{{ b.cancelled_at|at }}</span>{% endif %}
             {% endcall %}
           {% endif %}
           {% if not (b.status == "cancelled" and b.payment_status == "unpaid") %}
@@ -166,7 +158,7 @@
             <div class="card-footer">
               {% if fix %}{{ retry("Retry refund · " ~ b.refund_amount_satang|money, primary=True) }}{% endif %}
               {% if again %}<a class="btn btn-primary" href="{{ book_again }}">Book again</a>{% endif %}
-              {% if ticket %}<a class="text-link" href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a>{% endif %}
+              {% if ticket %}<a class="btn" href="{{ b.ticket_url }}" target="_blank" rel="noopener">View e-ticket</a>{% endif %}
             </div>
           {% endif %}
         {% endif %}
@@ -202,14 +194,11 @@
       <section class="summary">
         <h2 class="summary-title">Price</h2>
         {% if b.coverage == "plan" %}
-          <div class="summary-row"><span>{{ b.blocks|duration }}, {{ b.space_name }}</span><span class="num">{{ b.agreed_price_satang|money }}</span></div>
-          <div class="summary-row"><span>Covered by {{ whose }} plan</span><span class="num">−{{ b.agreed_price_satang|money }}</span></div>
-          <div class="summary-total"><span>{{ "You pay" if own else "Member pays" }}</span><span>{{ 0|money }}</span></div>
-          <p class="summary-coverage">No payment taken</p>
+          <p class="summary-lead">Covered by {{ whose }} plan · no payment</p>
+          <p class="summary-coverage">{{ b.blocks|duration }}, {{ b.space_name }}. Agreed price <span class="num nowrap">{{ b.agreed_price_satang|money }}</span>, covered by the plan.</p>
         {% elif b.coverage == "free" %}
-          <div class="summary-row"><span>{{ b.blocks|duration }}, {{ b.space_name }}</span><span>Free</span></div>
-          <div class="summary-total"><span>{{ "You pay" if own else "Member pays" }}</span><span>{{ 0|money }}</span></div>
-          <p class="summary-coverage">This space is free. No payment taken</p>
+          <p class="summary-lead">Free · no payment</p>
+          <p class="summary-coverage">{{ b.blocks|duration }}, {{ b.space_name }}. This space is free.</p>
         {% else %}
           <div class="summary-row"><span>{{ b.blocks|duration }}, {{ b.space_name }}</span><span class="num">{{ b.agreed_price_satang|money }}</span></div>
           <div class="summary-total"><span>Total</span><span>{{ b.agreed_price_satang|money }}</span></div>
