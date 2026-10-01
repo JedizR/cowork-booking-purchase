@@ -98,7 +98,7 @@
     function free(i) { return i >= 0 && i < slots.length && !slots[i].disabled; }
     function from(i) { return slots[i].dataset.time; }
     function until(i) { return slots[i].dataset.end; }
-    // From slot a toward slot b: the longest run of free blocks, at most 8, and why it stopped short.
+    // From slot a toward slot b: the longest run of free blocks, at most 8, why it stopped short and where.
     function span(a, b) {
       var step = b >= a ? 1 : -1, k = a, stop = "";
       while (k !== b) {
@@ -106,26 +106,34 @@
         if (!free(k + step)) { stop = slots[k + step].classList.contains("is-booked") ? "booked" : "soon"; break; }
         k += step;
       }
-      return { s: Math.min(a, k), e: Math.max(a, k), stop: stop, back: step < 0 };
+      return { s: Math.min(a, k), e: Math.max(a, k), stop: stop, back: step < 0, at: k + step };
     }
-    // A trimmed range is an outcome, not an error: say what the range became and why.
+    // "14:00–15:00 is booked": the whole blocked run around slot k, as the timeline shows it.
+    function blocked(k) {
+      var cls = slots[k].classList.contains("is-booked") ? "is-booked" : "is-unavailable", a = k, b = k;
+      while (a > 0 && slots[a - 1].classList.contains(cls)) a--;
+      while (b < slots.length - 1 && slots[b + 1].classList.contains(cls)) b++;
+      return from(a) + "–" + until(b) + (cls === "is-booked" ? " is booked" : " is too soon");
+    }
+    // A range the rules cut short is an outcome, not an error: say what it became and why.
     function trimmed(r) {
-      if (r.stop === "max") return "Shortened to 4 h, the longest booking";
-      if (r.stop === "booked") return r.back ? "Starts at " + from(r.s) + ": the room is booked until then"
-        : "Shortened to " + until(r.e) + ": the room is booked from " + until(r.e);
-      if (r.stop === "soon") return "Starts at " + from(r.s) + ": earlier times are too soon";
-      return "";
+      if (!r.stop) return "";
+      var edge = r.back ? "Starts at " + from(r.s) : "Ends at " + until(r.e);
+      return edge + " — " + (r.stop === "max" ? "4 h is the longest booking" : blocked(r.at));
     }
     function fresh(i) { start = i; end = span(i, i + dflt - 1).e; picking = true; note = ""; }
 
+    // Two taps, like check-in and check-out: the first sets the start, the second the end. A second tap that
+    // the rules cannot reach from the start begins a new range there and says why; a tap after a complete
+    // range begins a new one.
     function choose(i) {
       if (!free(i)) return;
-      if (start === null || i < start) fresh(i);
-      else if (picking || i > end) {
+      if (start === null || !picking || i < start) fresh(i);
+      else {
         var r = span(start, i);
-        if (r.stop === "booked" || r.stop === "soon") fresh(i);  // past a booked block: start over there
+        if (r.stop === "booked" || r.stop === "soon") { fresh(i); note = "New range from " + from(i) + " — " + blocked(r.at); }
         else { end = r.e; picking = false; note = trimmed(r); }
-      } else { end = i; picking = false; note = ""; }  // inside the range: the end moves back to this block
+      }
       hover = null;
       paint();
     }
@@ -134,7 +142,7 @@
 
     function paint() {
       var pv = null;
-      if (start !== null && hover !== null && hover > end) {
+      if (picking && hover !== null && hover > end) {
         var r = span(start, hover);
         if (r.e > end && r.stop !== "booked" && r.stop !== "soon") pv = r.e;
       }
@@ -150,7 +158,8 @@
         el.setAttribute("aria-pressed", sel ? "true" : "false");
         el.setAttribute("aria-label", from(i) + " to " + until(i) + ", " + (sel ? "selected" : "free"));
         el.tabIndex = i === (start === null ? firstFree : start) ? 0 : -1;
-        if (start !== null && i > end) {
+        // What a tap here does, shown on hover, focus and (touch) on every free row.
+        if (picking && i >= start) {
           var s = span(start, i);
           el.dataset.hint = s.stop === "booked" || s.stop === "soon" ? "Start " + from(i) : s.e === i ? "End " + until(i) : "End " + until(s.e) + " (4 h max)";
         } else el.dataset.hint = "Start " + from(i);
@@ -169,8 +178,8 @@
       } else {
         var price = Math.floor((rate * n + 1) / 2);  // round_half_up(rate x blocks / 2), PUR-R17
         title.textContent = day + " · " + from(start) + "–" + until(last);
-        meta.textContent = dur(n) + " · " + (coverage === "plan" ? "Covered by your plan · " + thb(0)
-          : coverage === "free" ? "Free · " + thb(0) : thb(price));
+        meta.textContent = dur(n) + " · " + (coverage === "plan" ? "Covered by your plan · no payment"
+          : coverage === "free" ? "Free · no payment" : thb(price));
         // The refund terms for this exact start (PUR-R30): the booking.com "Free cancellation until ..." line.
         var at = Date.parse(date + "T" + from(start) + ":00+07:00");
         refund.textContent = coverage !== "pay" ? "You can cancel until the start"
@@ -186,7 +195,7 @@
         btn.textContent = !anon && narrow.matches && !reviewed && start !== null ? "Review details" : label;
       }
       hint.textContent = note || (anon && start !== null ? "After you log in, tap your start time again; we keep the date and length."
-        : picking ? "Select an end time, or keep 30 min" : "");
+        : picking ? "Now tap an end time, or keep " + dur(end - start + 1) : "");
       hint.hidden = !hint.textContent;
       hint.classList.toggle("is-info", !!note);
       // The end handle sits on the bottom edge of the range: drag it to resize (touch included).
@@ -252,10 +261,13 @@
       var el = e.target.closest(".slot");
       if (!el) return;
       if (e.key === "Escape" && start !== null) { reset(); return; }
-      var step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+      // Up and Down move to the next free block, Home and End to the first and last one.
+      var step = { ArrowDown: 1, ArrowUp: -1, Home: 1, End: -1 }[e.key];
       if (!step) return;
       e.preventDefault();
-      for (var k = +el.dataset.i + step; k >= 0 && k < slots.length; k += step) if (free(k)) { slots[k].focus(); return; }
+      var k = e.key === "Home" ? 0 : e.key === "End" ? slots.length - 1 : +el.dataset.i + step;
+      while (k >= 0 && k < slots.length && !free(k)) k += step;
+      if (free(k)) slots[k].focus();
     });
     clear.addEventListener("click", function () { reset(); if (firstFree >= 0) slots[firstFree].focus({ preventScroll: true }); });
     window.addEventListener("resize", paint);

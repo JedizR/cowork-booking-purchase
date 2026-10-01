@@ -166,7 +166,7 @@
       <div class="sticky-bar-inner">
         <div class="sticky-bar-summary" aria-live="polite">
           <span class="sticky-bar-title" id="bar-title">Choose a time</span>
-          <span class="sticky-bar-meta" id="bar-meta">{% if coverage == "free" %}Free · {{ 0|money }}{% elif coverage == "plan" %}Covered by your plan · {{ 0|money }}{% else %}{{ half|money }} per 30 min{% endif %}</span>
+          <span class="sticky-bar-meta" id="bar-meta">{% if coverage == "free" %}Free · no payment{% elif coverage == "plan" %}Covered by your plan · no payment{% else %}{{ half|money }} per 30 min{% endif %}</span>
           <span class="sticky-bar-refund" id="bar-refund" hidden></span>
           <span class="sticky-bar-hint" id="range-hint" hidden></span>
         </div>

@@ -123,7 +123,8 @@
 .policy-title { margin: 0 0 2px; font-size: var(--fs-caption); font-weight: 600; }
 .sticky-bar-refund { font-size: var(--fs-caption); color: var(--ink); font-weight: 600; }
 .sticky-bar-hint { font-size: var(--fs-caption); color: var(--muted); }
-.sticky-bar-hint.is-info { color: var(--ink); }
+/* A range the rules changed or restarted: said in ink next to the summary, so the change is never silent. */
+.sticky-bar-hint.is-info { color: var(--ink); font-weight: 600; }
 .sticky-bar-hint.is-info::before {
   content: "i"; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; vertical-align: -2px;
   border-radius: 50%; border: 1.5px solid var(--ink); box-sizing: border-box; color: var(--ink); font-size: 10px; font-weight: 700;
