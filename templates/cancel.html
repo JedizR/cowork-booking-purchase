@@ -10,7 +10,7 @@
 
     <div class="summary confirm-summary">
       <h2 class="summary-title">What happens</h2>
-      <p class="confirm-refund">{{ text }}</p>
+      <p class="confirm-refund{% if text|length > 40 %} is-long{% endif %}">{{ text }}</p>
       <ul class="consequences">
         {% if b.status == "confirmed" %}<li>The e-ticket is cancelled and stops opening the door.</li>{% endif %}
         {% if b.status == "held" %}<li>The held time is released for others to book.</li>{% endif %}
