@@ -56,7 +56,10 @@
 .topnav-link:hover, .topnav-link[aria-current="page"] { color: var(--on-dark); text-decoration: none; }
 .topnav-btn-solid { background: var(--on-dark); border-color: var(--on-dark); color: var(--black); font-weight: 600; }
 .topnav-btn-solid:hover { background: var(--fill); }
-@media (max-width: 1068px) { .topnav-name { display: none; } .topnav-account summary { padding-right: 8px; } }
+/* The bar shows the avatar and the display name only (the email is inside the menu); long names truncate. */
+.topnav-account .topnav-name { max-width: 180px; }
+@media (max-width: 640px) { .topnav-account .topnav-name { max-width: 120px; } }
+@media (max-width: 419px) { .topnav-account .topnav-name { max-width: 84px; } }
 /* Operator tabs on phones: they scroll sideways, and the right edge fades to say so. */
 .subnav .tabs a { gap: 6px; }
 .tab-count { min-width: 18px; height: 18px; font-size: 11px; }

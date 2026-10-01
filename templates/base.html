@@ -40,9 +40,10 @@
         </nav>
         <div class="topnav-right">
           {% if me %}
-            {# One account menu: who is logged in (PUR-R02 shows the email), My bookings, and Log out as a POST (PUR-R37). #}
+            {# The bar shows the avatar and display name; the menu says who is logged in with the email (PUR-R02),
+               My bookings, and Log out as a POST (PUR-R37). #}
             <details class="topnav-menu topnav-account">
-              <summary class="topnav-user" title="{{ me.display_name }} ({{ me.email }})"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }} ({{ me.email }})</span><span class="visually-hidden">Account menu</span></summary>
+              <summary class="topnav-user"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }}</span><span class="visually-hidden">, account menu</span></summary>
               <div class="topnav-menu-panel">
                 <p class="account-who"><strong>{{ me.display_name }}</strong><span>{{ me.email }}</span></p>
                 <a href="/bookings/mine">My bookings</a>

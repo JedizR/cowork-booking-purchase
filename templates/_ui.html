@@ -38,16 +38,17 @@
   {%- endif -%}
 {%- endmacro %}
 
-{# The operator section's tabs (PUR-R06), with the same labels as the header menu. #}
+{# The operator section's tabs (PUR-R06): the same five short labels as Payment's operator page, so the
+   section reads as one place; the script scrolls the current tab into view on a phone. #}
 {% macro operator_nav(active) %}
   <div class="subnav">
     <div class="subnav-inner">
       <span class="subnav-title">Operator</span>
       <nav class="tabs" aria-label="Operator">
-        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "All bookings"), ("/operator/spaces", "spaces", "Spaces admin"), ("/operator/members", "members", "Members")] %}
+        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "Bookings"), ("/operator/spaces", "spaces", "Spaces"), ("/operator/members", "members", "Members")] %}
           <a href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>{{ label }}{% if key == "bookings" and attention and attention.flagged %} <span class="tab-count" title="Bookings that need a person">{{ attention.flagged }}</span>{% endif %}</a>
         {% endfor %}
-        <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
+        <a href="{{ payment_public_url }}/operator">Payments <span aria-hidden="true">↗</span></a>
       </nav>
     </div>
   </div>

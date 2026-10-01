@@ -28,8 +28,11 @@
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") $$("details.topnav-menu[open]").forEach(function (d) { d.open = false; d.querySelector("summary").focus(); });
   });
-  var chip = $(".date-strip [aria-current]");
-  if (chip) chip.parentNode.scrollLeft = chip.offsetLeft - chip.parentNode.offsetWidth / 2 + chip.offsetWidth / 2;
+  // Sideways rows (the date strip, the operator tabs on a phone) open with the current item in view.
+  $$(".date-strip [aria-current], .subnav .tabs [aria-current]").forEach(function (el) {
+    var row = el.parentNode, a = row.getBoundingClientRect(), b = el.getBoundingClientRect();
+    row.scrollLeft += b.left - a.left - (a.width - b.width) / 2;
+  });
 
   /* Party size and note survive a date change in this tab (a per-viewer convenience, PUR-R14 still on the server). */
   function keepDetails(form) {
