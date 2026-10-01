@@ -15,8 +15,8 @@ def slot(html, hhmm):
 
 
 def test_pur_r13_timeline_marks_each_block_free_or_with_its_reason(app):
-    a = member(app)
-    book_json(a)  # 09:00-10:30 held, slot-blocking
+    a, b = member(app), member(app, "b@example.com", "B")
+    book_json(b)  # 09:00-10:30 held by someone else, slot-blocking
     html = a.get("/spaces/1?date=2026-10-07").get_data(as_text=True)
     assert html.count('<button type="button" class="slot') == 24 and "timeline-end" in html
     assert slot(html, "08:30") == ("slot", False)  # ends where the booking starts (PUR-R11)
@@ -26,6 +26,18 @@ def test_pur_r13_timeline_marks_each_block_free_or_with_its_reason(app):
     assert 'aria-label="09:00 to 09:30, booked"' in html and "Runs past 20:00</span>" not in html
     today = a.get("/spaces/1?date=2026-10-05").get_data(as_text=True)  # clock 10:00: before 11:00 is too soon
     assert slot(today, "10:30") == ("slot is-unavailable", True) and slot(today, "11:00") == ("slot", False)
+
+
+def test_pur_r39_a_live_hold_makes_the_timeline_read_only_and_links_the_own_booking(app):
+    a = member(app)
+    ref = book_json(a).get_json()["reference"]  # 09:00-10:30 held
+    html = a.get("/spaces/1?date=2026-10-07").get_data(as_text=True)
+    assert slot(html, "08:30") == ("slot", True) and slot(html, "19:30") == ("slot", True)  # readable, not pickable
+    assert html.count(f'<a class="slot is-booked" href="/bookings/{ref}"') == 3 and ">Yours</span>" in html
+    assert 'id="bar"' not in html and 'id="details"' not in html  # the hold banner is the one action
+    assert f"Finish or cancel {ref} to pick a time" in html
+    other = a.get("/spaces/2?date=2026-10-07").get_data(as_text=True)  # any room: one held booking at a time
+    assert slot(other, "09:00") == ("slot", True) and 'id="bar"' not in other
 
 
 def test_pur_r13_day_without_a_free_block_offers_the_next_day(app):

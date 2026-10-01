@@ -81,19 +81,22 @@
 
         <div class="picker-time">
           {% if free_slots %}
-            <div class="timeline" id="timeline" role="group" aria-labelledby="tl-title" data-default-blocks="{{ blocks }}">
+            <div class="timeline{% if hold %} is-locked{% endif %}" id="timeline" role="group" aria-labelledby="tl-title" data-default-blocks="{{ blocks }}">
               <div class="timeline-head">
                 <h2 class="timeline-title" id="tl-title">{{ day|fdate("long") }}</h2>
-                <p class="timeline-hint">Tap a start, then an end · 30 min to 4 h</p>
+                <p class="timeline-hint">{% if hold %}Finish or cancel {{ hold.reference }} to pick a time{% else %}Tap a start, then an end · 30 min to 4 h{% endif %}</p>
               </div>
               {% if fold %}<p class="timeline-before"><span class="slot-time">{{ slots[0].start|hhmm }}</span><span class="timeline-before-body"><span class="slot-reason">Before {{ slots[fold].start|hhmm }}: too soon<span class="fold-why">, book at least 60 min ahead</span></span></span></p>{% endif %}
               <div class="timeline-slots">
                 {% for s in slots %}
                   {% set t, e = s.start|hhmm, s.end|hhmm %}
                   {% if s.available %}
-                    <button type="button" class="slot" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" data-hint="Start {{ t }}" aria-pressed="false" aria-label="{{ t }} to {{ e }}, free"><span class="slot-time">{{ t }}</span><span class="slot-body"></span></button>
+                    <button type="button" class="slot" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" {% if hold %} disabled aria-label="{{ t }} to {{ e }}, free"{% else %} data-hint="Start {{ t }}" aria-pressed="false" aria-label="{{ t }} to {{ e }}, free"{% endif %}><span class="slot-time">{{ t }}</span><span class="slot-body"></span></button>
+                  {% elif s.mine %}
+                    {# The Member's own booking is booked for everyone; a tap opens it. #}
+                    <a class="slot is-booked" href="/bookings/{{ s.mine }}" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" data-mine="{{ s.mine }}" aria-label="{{ t }} to {{ e }}, your booking {{ s.mine }}"><span class="slot-time">{{ t }}</span><span class="slot-body"><span class="slot-reason">Yours · {{ s.mine }}</span></span></a>
                   {% else %}
-                    <button type="button" class="slot {{ 'is-booked' if s.reason == 'Booked' else 'is-unavailable' }}" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}"{% if s.mine %} data-mine="{{ s.mine }}"{% endif %} disabled{% if loop.index0 < fold %} hidden{% endif %} aria-label="{{ t }} to {{ e }}, {{ s.reason|lower }}"><span class="slot-time">{{ t }}</span><span class="slot-body"><span class="slot-reason">{% if s.mine %}Booked · yours, {{ s.mine }}{% else %}{{ s.reason }}{% endif %}</span></span></button>
+                    <button type="button" class="slot {{ 'is-booked' if s.reason == 'Booked' else 'is-unavailable' }}" data-i="{{ loop.index0 }}" data-time="{{ t }}" data-end="{{ e }}" disabled{% if loop.index0 < fold %} hidden{% endif %} aria-label="{{ t }} to {{ e }}, {{ s.reason|lower }}"><span class="slot-time">{{ t }}</span><span class="slot-body"><span class="slot-reason">{{ s.reason }}</span></span></button>
                   {% endif %}
                 {% endfor %}
                 <div class="timeline-end" aria-hidden="true"><span class="slot-time">20:00</span><span class="slot-body"></span></div>
@@ -101,8 +104,9 @@
             </div>
             <div class="timeline-legend" aria-hidden="true">
               <span class="legend-item"><i class="legend-swatch"></i>Free</span>
-              <span class="legend-item"><i class="legend-swatch is-selected"></i>Your time</span>
+              {% if not hold %}<span class="legend-item"><i class="legend-swatch is-selected"></i>Your pick</span>{% endif %}
               <span class="legend-item"><i class="legend-swatch is-booked"></i>Booked</span>
+              {% if slots|selectattr("mine")|list %}<span class="legend-item"><i class="legend-swatch is-booked is-mine"></i>Yours</span>{% endif %}
               <span class="legend-item"><i class="legend-swatch is-unavailable"></i>Too soon</span>
             </div>
           {% else %}
@@ -128,6 +132,7 @@
           </noscript>
         </div>
 
+        {% if not hold %}
         <div class="card picker-details stack stack-sm" id="details">
           <h2 class="card-title">Details</h2>
           <div class="field">
@@ -156,12 +161,14 @@
             {% endif %}
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
 
     <input type="hidden" name="date" value="{{ day }}">
     <input type="hidden" name="start" value="" disabled>
     <input type="hidden" name="blocks" value="{{ blocks }}">
+    {% if not hold %}
     <div class="sticky-bar is-idle" id="bar">
       <div class="sticky-bar-inner">
         <div class="sticky-bar-summary" aria-live="polite">
@@ -171,10 +178,11 @@
           <span class="sticky-bar-hint" id="range-hint" hidden></span>
         </div>
         <div class="sticky-bar-actions">
-          <button class="btn btn-ghost sticky-bar-clear" type="button" id="bar-clear" hidden>Clear</button>
+          <button class="btn btn-secondary sticky-bar-clear" type="button" id="bar-clear" hidden>Clear</button>
           <button class="btn btn-primary btn-lg" type="submit" id="bar-btn">{% if not me %}Log in to book{% elif coverage == "pay" %}Continue to payment{% else %}Book{% endif %}</button>
         </div>
       </div>
     </div>
+    {% endif %}
   </form>
 {% endblock %}

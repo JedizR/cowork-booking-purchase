@@ -105,13 +105,19 @@
   background: var(--parchment) radial-gradient(var(--field-border) 0.9px, transparent 1.3px) 0 0 / 6px 6px;
 }
 .slot.is-unavailable .slot-reason, .timeline-before .slot-reason { background: var(--parchment); padding: 2px 6px; margin-left: -6px; border-radius: var(--r-xs); color: var(--ink-80); }
-/* The Member's own booking: outlined in ink, not hatched like someone else's. */
-.slot.is-booked[data-mine] .slot-body { background: var(--canvas); color: var(--ink); border-top: 0;
+/* The Member's own booking: booked (hatched) like any other, with an ink edge and a link to it. */
+a.slot[data-mine] { pointer-events: auto; cursor: pointer; }
+a.slot[data-mine]:hover .slot-reason { text-decoration: underline; }
+a.slot[data-mine]:focus-visible { outline: none; }
+a.slot[data-mine]:focus-visible .slot-body { outline: 2px solid var(--black); outline-offset: -2px; }
+.slot.is-booked:not([data-mine]) + .slot[data-mine] .slot-reason, .slot[data-mine] + .slot.is-booked:not([data-mine]) .slot-reason { visibility: visible; }
+.legend-swatch.is-mine { border: 1.5px solid var(--ink); }
+.slot.is-booked[data-mine] .slot-body { color: var(--ink); border-top: 0;
   box-shadow: inset 1.5px 0 0 var(--ink), inset -1.5px 0 0 var(--ink), inset 0 1.5px 0 var(--top-c, transparent), inset 0 -1.5px 0 var(--bottom-c, transparent); }
 .slot.is-booked[data-mine]:not(.slot[data-mine] + .slot) .slot-body { --top-c: var(--ink); border-radius: var(--r-md) var(--r-md) 0 0; }
 .slot.is-booked[data-mine]:not(:has(+ .slot[data-mine])) .slot-body { --bottom-c: var(--ink); border-radius: 0 0 var(--r-md) var(--r-md); }
 .slot.is-booked[data-mine]:not(.slot[data-mine] + .slot):not(:has(+ .slot[data-mine])) .slot-body { border-radius: var(--r-md); }
-.slot.is-booked[data-mine] .slot-reason { background: none; font-weight: 600; color: var(--ink); }
+.slot.is-booked[data-mine] .slot-reason { background: var(--canvas); font-weight: 600; color: var(--ink); }
 /* The end handle: drag it to change the end (touch and mouse). */
 .range-handle {
   position: absolute; z-index: 3; left: calc(50% + var(--gutter-w) / 2); width: 44px; height: 24px; margin: -12px 0 0 -22px;
@@ -131,7 +137,6 @@
   border-radius: 50%; border: 1.5px solid var(--ink); box-sizing: border-box; color: var(--ink); font-size: 10px; font-weight: 700;
 }
 .sticky-bar.is-preview .sticky-bar-title, .sticky-bar.is-preview .sticky-bar-meta { color: var(--muted); }
-.sticky-bar.is-ref-title .sticky-bar-title { font-variant-numeric: normal; }
 .sticky-bar .btn:disabled { opacity: 1; }
 .sticky-bar-clear { min-height: 52px; }
 .noscript-duration { display: flex; align-items: flex-end; gap: var(--sp-4); margin-bottom: var(--sp-5); }
@@ -156,13 +161,21 @@
   .space-header .eyebrow { display: none; }
   .back-link { margin-bottom: var(--sp-3); }
   .timeline-head { display: none; }  /* the selected date chip and the bar already say both */
+  .timeline.is-locked .timeline-head { display: flex; }  /* no bar while a hold is live: say why the day cannot be picked */
   .timeline-legend { margin-top: var(--sp-4); gap: var(--sp-2) var(--sp-4); }
   /* Idle bar: one line and no disabled button until a start is picked. */
   .sticky-bar.is-idle .sticky-bar-actions { display: none; }
   .sticky-bar.is-idle .sticky-bar-inner { min-height: 40px; }
   .sticky-bar.is-idle .sticky-bar-summary { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); }
-  [data-anon="1"] .sticky-bar.is-idle .sticky-bar-actions { display: flex; }
-  .sticky-bar-actions .sticky-bar-clear { flex: none; padding: 0 var(--sp-3); }
+  [data-anon="1"] .sticky-bar.is-idle .sticky-bar-actions { display: contents; }
+  /* A picked range: summary with Clear beside it, then the one button, so the bar hides few rows of the day. */
+  .sticky-bar-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--sp-2) var(--sp-3); }
+  .sticky-bar-actions { display: contents; }
+  .sticky-bar-actions .sticky-bar-clear { grid-column: 2; grid-row: 1; min-height: 32px; padding: 5px 14px; font-size: var(--fs-caption); position: relative; }
+  .sticky-bar-clear::after { content: ""; position: absolute; inset: -6px -4px; }  /* a 44 px target around a small button */
+  #bar-btn { grid-column: 1 / -1; }
+  /* One muted line under the price: the hint while there is one, else the refund terms. */
+  .sticky-bar-summary:has(.sticky-bar-hint:not([hidden])) .sticky-bar-refund { display: none; }
 }
 .date-chip {
   flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; width: 52px; padding: 6px 0 7px;

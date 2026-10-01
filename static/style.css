@@ -704,14 +704,14 @@ a.chip:hover, button.chip:hover, label.chip:hover { border-color: var(--ink); te
 .slot.is-booked .slot-reason { background: var(--parchment); padding: 2px 6px; margin-left: -6px; border-radius: var(--r-xs); }
 
 /* free: a quiet outlined cell, so the day reads as time you can tap (Calendly); hover and focus show the hint */
-.slot:not(:disabled):not(.is-selected):not(.is-preview) .slot-body::before {
+.slot:not(:disabled):not(.is-booked):not(.is-unavailable):not(.is-selected):not(.is-preview) .slot-body::before {
   content: ""; position: absolute; inset: 3px 0 2px; border: 1px solid var(--fill-strong); border-radius: var(--r-sm); pointer-events: none;
 }
 .slot:not(:disabled):not(.is-selected):not(.is-booked):not(.is-unavailable):hover .slot-body,
-.slot:not(:disabled):not(.is-selected):not(.is-preview):focus-visible .slot-body { background: var(--parchment); }
+.slot:not(:disabled):not(.is-booked):not(.is-unavailable):not(.is-selected):not(.is-preview):focus-visible .slot-body { background: var(--parchment); }
 /* A press shows the pick at once (no wait for the click), and a tap never waits for a double-tap zoom. */
 .slot { touch-action: manipulation; }
-.slot:not(:disabled):not(.is-selected):active .slot-body { background: var(--ink); color: var(--on-dark); }
+.slot:not(:disabled):not(.is-booked):not(.is-unavailable):not(.is-selected):active .slot-body { background: var(--ink); color: var(--on-dark); }
 /* The hint sits on the button itself: attr() reads the element that owns the pseudo-element, and data-hint is on .slot. */
 .slot { position: relative; }
 .slot::after {

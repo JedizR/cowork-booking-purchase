@@ -15,7 +15,9 @@
     return DOW[d.getUTCDay()] + " " + d.getUTCDate() + " " + MON[d.getUTCMonth()] + ", " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
   }
 
+  // With a live hold the timeline is read-only and the banner is the one action (PUR-R39): no picker.
   var form = $("#book");
+  if (form && form.dataset.hold) form = null;
   if (form) keepDetails(form);
   $$("[data-stepper]").forEach(stepper);
   if (form) picker(form);
@@ -77,19 +79,18 @@
 
   /* Range picker (DESIGN 8.1): tap a start, then an end, on the day; tap again to move the end; drag the
      handle (touch) or drag across rows (mouse). The server rendered each 30-min block as free or blocked
-     with its reason (PUR-R13); this only joins contiguous free blocks, 1 to 8. */
+     with its reason (PUR-R13); this only joins contiguous free blocks, 1 to 8. The bar's button books at
+     once: party size shows in the bar, so the second tap plus one press books, on a phone too. */
   function picker(form) {
     var root = $("#timeline"), bar = $("#bar"), btn = $("#bar-btn"), title = $("#bar-title"), meta = $("#bar-meta");
-    var refund = $("#bar-refund"), hint = $("#range-hint"), clear = $("#bar-clear"), details = $("#details");
+    var refund = $("#bar-refund"), hint = $("#range-hint"), clear = $("#bar-clear"), party = form.elements.party_size;
     var startIn = form.elements.start, blocksIn = form.elements.blocks, anon = form.dataset.anon === "1";
     var rate = +form.dataset.rate, coverage = form.dataset.coverage, day = form.dataset.day, date = form.dataset.date;
-    var now = Date.parse(form.dataset.now), hold = form.dataset.hold || "";
-    var narrow = window.matchMedia("(max-width: 833px)"), label = btn.textContent, reviewed = false, MAX = 8;
-    if (narrow.matches) title.textContent = "Tap a start time";
-    if (hold) title.textContent = "Finish " + hold + " first";
+    var now = Date.parse(form.dataset.now), MAX = 8;
+    if (window.matchMedia("(max-width: 833px)").matches) title.textContent = "Tap a start time";
     var idle = [title.textContent, meta.textContent];
     startIn.disabled = false;
-    if (!root) { btn.disabled = !anon || !!hold; return; }
+    if (!root) { btn.disabled = !anon; return; }
     var slots = $$(".slot", root), dflt = Math.min(MAX, Math.max(1, +root.dataset.defaultBlocks || 1));
     var start = null, end = null, picking = false, hover = null, note = "", drag = null, suppress = false;
     var handle = document.createElement("span");
@@ -98,7 +99,8 @@
     handle.hidden = true;
     root.appendChild(handle);
 
-    function free(i) { return i >= 0 && i < slots.length && !slots[i].disabled; }
+    // Free = a button that is not disabled; the Member's own booking is a link to it, never free.
+    function free(i) { return i >= 0 && i < slots.length && slots[i].tagName === "BUTTON" && !slots[i].disabled; }
     function from(i) { return slots[i].dataset.time; }
     function until(i) { return slots[i].dataset.end; }
     // From slot a toward slot b: the longest run of free blocks, at most 8, why it stopped short and where.
@@ -141,7 +143,7 @@
       paint();
     }
 
-    function reset() { start = end = null; picking = false; note = ""; hover = null; reviewed = false; paint(); }
+    function reset() { start = end = null; picking = false; note = ""; hover = null; paint(); }
 
     function paint() {
       var pv = null;
@@ -150,7 +152,7 @@
         if (r.e > end && r.stop !== "booked" && r.stop !== "soon") pv = r.e;
       }
       slots.forEach(function (el, i) {
-        if (el.disabled) return;
+        if (!free(i)) return;
         var sel = start !== null && i >= start && i <= end, body = el.lastElementChild;
         el.classList.toggle("is-selected", sel);
         el.classList.toggle("is-range-start", sel && i === start);
@@ -173,7 +175,6 @@
       });
       var last = pv !== null ? pv : end, n = start === null ? 0 : last - start + 1;
       bar.classList.toggle("is-idle", start === null);
-      bar.classList.toggle("is-ref-title", !!hold && start === null);  // a reference, not a time: no tabular hyphen
       bar.classList.toggle("is-preview", pv !== null);
       clear.hidden = start === null;
       if (start === null) {
@@ -182,7 +183,7 @@
         var price = Math.floor((rate * n + 1) / 2);  // round_half_up(rate x blocks / 2), PUR-R17
         title.textContent = day + " · " + from(start) + "–" + until(last);
         meta.textContent = dur(n) + " · " + (coverage === "plan" ? "Covered by your plan · no payment"
-          : coverage === "free" ? "Free · no payment" : thb(price));
+          : coverage === "free" ? "Free · no payment" : thb(price)) + " · Party of " + (+party.value || 1);
         // The refund terms for this exact start (PUR-R30): the booking.com "Free cancellation until ..." line.
         var at = Date.parse(date + "T" + from(start) + ":00+07:00");
         refund.textContent = coverage !== "pay" ? "You can cancel until the start"
@@ -190,13 +191,7 @@
         refund.hidden = false;
         startIn.value = from(start); blocksIn.value = end - start + 1;
       }
-      // PUR-R39: with a live hold every other request is refused; the banner resumes or cancels the hold, and
-      // the hold's own blocks read "Booked · yours" here.
-      if (hold) { btn.disabled = true; btn.textContent = "Finish " + hold + " first"; }
-      else {
-        btn.disabled = !anon && start === null;
-        btn.textContent = !anon && narrow.matches && !reviewed && start !== null ? "Review details" : label;
-      }
+      btn.disabled = !anon && start === null;
       hint.textContent = note || (anon && start !== null ? "After you log in, tap your start time again; we keep the date and length."
         : picking ? "Now tap an end time, or keep " + dur(end - start + 1) : "");
       hint.hidden = !hint.textContent;
@@ -208,7 +203,7 @@
       if (!handle.hidden) handle.style.top = (slots[end].offsetTop + slots[end].offsetHeight) + "px";
     }
 
-    var firstFree = slots.findIndex(function (el) { return !el.disabled; });
+    var firstFree = slots.findIndex(function (el, i) { return free(i); });
     root.addEventListener("click", function (e) {
       var el = e.target.closest(".slot");
       if (suppress) { suppress = false; return; }
@@ -223,7 +218,7 @@
         return;
       }
       var el = e.target.closest(".slot");
-      if (e.pointerType === "touch" || e.button !== 0 || !el || el.disabled) return;
+      if (e.pointerType === "touch" || e.button !== 0 || !el || !free(+el.dataset.i)) return;
       drag = { a: +el.dataset.i, moved: false };
     });
     // The row under the pointer, by height only, so the handle under a finger never hides it.
@@ -237,7 +232,7 @@
     document.addEventListener("pointermove", function (e) {
       if (!drag) return;
       var el = slotAt(e.clientY);
-      if (!el || el.disabled) return;
+      if (!el || !free(+el.dataset.i)) return;
       var j = +el.dataset.i;
       if (j === drag.a && !drag.moved) return;
       drag.moved = true;
@@ -253,14 +248,19 @@
     root.addEventListener("pointerover", function (e) {
       if (e.pointerType === "touch" || drag) return;
       var el = e.target.closest(".slot");
-      hover = el && !el.disabled ? +el.dataset.i : hover;
+      hover = el && free(+el.dataset.i) ? +el.dataset.i : hover;
       if (start !== null) paint();
     });
     root.addEventListener("pointerleave", function () { hover = null; if (start !== null) paint(); });
     root.addEventListener("touchstart", function () {}, { passive: true });  // iOS applies :active (the pressed fill) only with one
     root.addEventListener("focusin", function (e) {
       var el = e.target.closest(".slot");
-      if (el && start !== null) { hover = +el.dataset.i; paint(); }
+      if (el && free(+el.dataset.i) && start !== null) { hover = +el.dataset.i; paint(); }
+    });
+    // Leaving the timeline by keyboard drops the preview, as the pointer leaving it does: the bar then shows
+    // exactly what the form sends.
+    root.addEventListener("focusout", function (e) {
+      if (!root.contains(e.relatedTarget)) { hover = null; if (start !== null) paint(); }
     });
     // Keyboard: slots are buttons (Enter and Space select); arrows move between free slots; Escape clears.
     root.addEventListener("keydown", function (e) {
@@ -277,17 +277,9 @@
     });
     clear.addEventListener("click", function () { reset(); if (firstFree >= 0) slots[firstFree].focus({ preventScroll: true }); });
     window.addEventListener("resize", paint);
+    party.addEventListener("input", paint);
     form.addEventListener("submit", function (e) {
-      if (!anon && !startIn.value) { e.preventDefault(); note = "Select a start time first"; paint(); return; }
-      // Phones: party size, note and the refund terms sit below the timeline. Show them once before the
-      // hold is made, because a hold keeps them (PUR-R21: to change them, cancel and book again).
-      if (!anon && narrow.matches && !reviewed && btn.textContent === "Review details") {
-        e.preventDefault();
-        reviewed = true;
-        details.scrollIntoView({ behavior: "smooth", block: "start" });
-        form.elements.party_size.focus({ preventScroll: true });
-        paint();
-      }
+      if (!anon && !startIn.value) { e.preventDefault(); note = "Select a start time first"; paint(); }
     });
     paint();
   }
