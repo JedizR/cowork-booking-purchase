@@ -315,7 +315,7 @@
 .agenda { list-style: none; margin: 0; padding: 0; }
 .agenda-day { padding: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-fine); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .agenda-day:first-child { padding-top: 0; }
-.agenda-row a { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--divider-soft); text-decoration: none; }
+.agenda-row a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; border-bottom: 1px solid var(--divider-soft); text-decoration: none; }
 .agenda-row a:hover strong { text-decoration: underline; }
 .agenda-row a > .num { font-size: var(--fs-callout); font-weight: 600; }
 .agenda-what { min-width: 0; font-size: var(--fs-callout); }
@@ -326,16 +326,15 @@
   .toolbar-search { flex: 1 1 100%; }
   .toolbar .segmented { max-width: 100%; }
   .dash-now { margin-bottom: var(--sp-6); }
-  .agenda-row a { grid-template-columns: 84px minmax(0, 1fr) auto; }
   /* Stacked operator rows (style.css .table-stack): what it is, its state and money on line 1; when and
-     who on line 2; the row's actions, full width, on line 3. */
+     who on line 2; the row's actions, full width, on line 3. The row's gap separates the facts of a line, so a
+     wrapped line never starts with a dot. */
   .table-stack td.cell-state { order: 1; color: var(--ink); }
   .table-stack td.cell-state .cell-sub { display: inline; margin: 0 0 0 6px; }
   .table-stack td.cell-when, .table-stack td.cell-member { order: 3; }
   .table-stack td.cell-when .cell-sub, .table-stack td.cell-when > span { display: inline; }
   .table-stack td.cell-when .cell-sub::before { content: ", "; }
   .table-stack td.cell-member { max-width: none; }
-  .table-stack td.cell-member::before { content: "·"; margin-right: var(--sp-2); }
   .table-stack td.cell-member .cell-sub { display: none; }
   .table-stack td.cell-money { order: 3; flex-basis: 100%; text-align: left; color: var(--ink); font-size: var(--fs-caption); font-weight: 600; }
   .table-stack td.cell-money .cell-sub { display: inline; margin-left: 6px; font-weight: 400; }
@@ -353,12 +352,9 @@
   .members-table td.cell-plan > form { order: 1; }
   .members-table td.cell-plan > .cell-sub { order: 3; flex-basis: 100%; margin: 0; }
   .members-table td.cell-role.is-plain { display: none; }
-  .members-table tr { column-gap: 6px; }
   .members-table td.col-num, .members-table td.cell-role, .members-table td.cell-joined { order: 3; font-weight: 400; font-size: var(--fs-caption); color: var(--muted); }
-  .members-table td.col-num::before, .members-table td.cell-role:not(.is-plain) + td.cell-joined::before { content: "·"; margin-right: 6px; }
   .members-table td.cell-role .badge { height: 20px; }
   /* Spaces: name and status on line 1, size and rate on line 2, Edit and Archive on line 3. */
   .spaces-table td.col-num { order: 3; font-weight: 400; font-size: var(--fs-caption); color: var(--ink-80); }
   .spaces-table td.col-num .cell-sub { display: none; }
-  .spaces-table td.col-num + td.col-num::before { content: "·"; margin-right: var(--sp-2); }
 }

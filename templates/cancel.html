@@ -8,7 +8,7 @@
   <section class="card confirm-card">
     <p class="eyebrow">Cancel booking</p>
     {# The PUR-R30 title names the booking, with the time the way every page says it. #}
-    <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }}, {{ ui.when(b) }}</h1>
+    <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }}, <span class="nowrap">{{ ui.when(b) }}</span></h1>
     <p class="meta confirm-when"><span>{{ b.blocks|duration }}</span><span>Party of {{ b.party_size }}</span>{% if by_operator %}<span>{{ b.member_name }} ({{ b.member_email }})</span>{% endif %}</p>
 
     <div class="summary confirm-summary">

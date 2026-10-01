@@ -82,7 +82,7 @@
         <span class="stat-label">Bookings started</span>
         {% if total %}
           <span class="stat-value">{{ total }}</span>
-          <span class="stat-meta num">{{ status.confirmed }} confirmed · {{ status.held }} held · {{ status.expired }} expired · {{ status.cancelled }} cancelled</span>
+          <span class="stat-meta num meta">{% for k in ("confirmed", "held", "expired", "cancelled") %}<span class="nowrap">{{ status[k] }} {{ k }}</span>{% endfor %}</span>
         {% else %}<span class="stat-empty">No booking started in these 7 days</span>{% endif %}
       </div>
       <div class="stat">
