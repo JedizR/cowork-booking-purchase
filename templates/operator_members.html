@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Members{% endblock %}
+{% block content %}
+  <h1>Members</h1>
+  <table>
+    <tr><th>Email</th><th>Display name</th><th>Plan</th><th></th></tr>
+    {% for m in rows %}
+      <tr>
+        <td>{{ m.email }}{% if m.is_operator %} (operator){% endif %}</td>
+        <td>{{ m.display_name }}</td>
+        <td>{{ "on" if m.plan_active else "off" }}</td>
+        <td>
+          <form method="post" action="/operator/members/{{ m.id }}/plan" data-member-email="{{ m.email }}" data-plan-active="{{ 'true' if m.plan_active else 'false' }}">
+            <input type="hidden" name="plan_active" value="{{ 'false' if m.plan_active else 'true' }}">
+            <button type="submit">{{ "Turn plan off" if m.plan_active else "Turn plan on" }}</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

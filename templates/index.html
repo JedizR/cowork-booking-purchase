@@ -2,37 +2,13 @@
 {% block title %}Spaces{% endblock %}
 {% block content %}
   <h1>Spaces</h1>
-  {% if error %}
-    <p class="message">Could not book: {{ error }}</p>
-  {% endif %}
-  <p class="hint">Times are Bangkok time (UTC+7).</p>
+  {% if not spaces %}<p>No spaces to book yet.</p>{% endif %}
   <ul class="list">
-    {% for space in spaces %}
+    {% for s in spaces %}
       <li>
-        <strong>{{ space.name }}</strong> - capacity {{ space.capacity }},
-        {{ space.price_cents|money }} per hour -
-        {% if space.id in booked_ids %}
-          <span class="status-busy">booked right now</span>
-        {% else %}
-          <span class="status-free">free right now</span>
-        {% endif %}
-        {% set coming_up = upcoming.get(space.id, []) %}
-        {% if coming_up %}
-          <p>Already booked:</p>
-          <ul>
-            {% for b in coming_up %}
-              <li>{{ b.start_time|local_time }} to {{ b.end_time|local_time }}</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p>No bookings coming up.</p>
-        {% endif %}
-        <form method="post" action="/spaces/{{ space.id }}/book">
-          <input name="member" placeholder="Your name" required>
-          <input type="datetime-local" name="start_time" required>
-          <input type="datetime-local" name="end_time" required>
-          <button type="submit">Book</button>
-        </form>
+        <a href="/spaces/{{ s.id }}"><strong>{{ s.name }}</strong></a>
+        <div>Up to {{ s.capacity }} people</div>
+        <div>{{ s.hourly_rate_satang|money }} per hour, {{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min</div>
       </li>
     {% endfor %}
   </ul>

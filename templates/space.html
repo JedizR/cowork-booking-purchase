@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ space.name }}{% endblock %}
+{% block content %}
+  <h1>{{ space.name }}</h1>
+  <p>Up to {{ space.capacity }} people. {{ space.hourly_rate_satang|money }} per hour.</p>
+  {% if hold %}<p class="message">{% if hold_text.startswith("Time to pay") %}{{ hold_text }}{% else %}You have a held booking {{ hold.reference }}, {{ hold.space_name }} {{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}. <a href="/bookings/{{ hold.reference }}">Open {{ hold.reference }}</a></p>{% endif %}
+  <form method="get" action="/spaces/{{ space.id }}">
+    <label>Date <input type="date" name="date" value="{{ day }}" min="{{ min_day }}" max="{{ max_day }}" onchange="this.form.submit()"></label>
+    <label>Duration <select name="blocks" onchange="this.form.submit()">
+      {% for n in range(1, 9) %}<option value="{{ n }}" {% if n == blocks %}selected{% endif %}>{{ n|duration }}</option>{% endfor %}
+    </select></label>
+    <button type="submit">Show starts</button>
+  </form>
+  <form method="post" action="/spaces/{{ space.id }}/book" class="booking-form">
+    <input type="hidden" name="date" value="{{ day }}">
+    <input type="hidden" name="blocks" value="{{ blocks }}">
+    <div class="grid">
+      {% for s in starts %}
+        {% if s.available %}
+          <label><input type="radio" name="start" value="{{ s.start|hhmm }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }}</label>
+        {% else %}
+          <label title="{{ s.reason }}" class="greyed"><input type="radio" name="start" value="{{ s.start|hhmm }}" disabled title="{{ s.reason }}"> {{ s.start|hhmm }}-{{ s.end|hhmm }} ({{ s.reason }})</label>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if not starts|selectattr("available")|list %}<p>No free start on this date. Try another date or a shorter duration.</p>{% endif %}
+    <label>Party size <input type="number" name="party_size" min="1" max="{{ space.capacity }}" value="1" required></label>
+    <label>Note <input name="note" maxlength="500" placeholder="Optional"></label>
+    {% if coverage == "plan" %}
+      <p>{{ space.name }}, {{ day }}, {{ blocks|duration }}: {{ price|money }}, covered by your plan. No payment needed.</p>
+    {% else %}
+      <p>{{ space.name }}, {{ day }}, {{ blocks|duration }}: {{ price|money }}</p>
+    {% endif %}
+    {% if coverage == "pay" %}
+      <p class="hint">Full refund if you cancel 24 h or more before the start; after that, no refund.{% if soon %} Starts less than 24 h away cannot be refunded.{% endif %}</p>
+    {% endif %}
+    <button type="submit">{% if not me %}Log in to book{% elif coverage == "pay" %}Continue to payment{% else %}Book{% endif %}</button>
+  </form>
+{% endblock %}

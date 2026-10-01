@@ -1,32 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Business Metrics{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block content %}
-  <h1>Cowork Booking — Business Metrics</h1>
-  <p>Cowork Booking is a space booking system where members find a space,
-     book it, pay once or subscribe, and get access through a
-     mocked lock.</p>
-  <ul class="cards">
-    <li>Spaces: {{ metrics.spaces }}</li>
-    <li>Bookings: {{ metrics.bookings }}</li>
-    <li>Paid bookings: {{ metrics.paid_bookings }}</li>
-    <li>Unpaid bookings: {{ metrics.unpaid_bookings }}</li>
-    <li>Members: {{ metrics.members }}</li>
-    <li>Revenue: {{ metrics.revenue_cents|money }}</li>
-    <li>Utilization (next 7 days): {{ metrics.utilization|percent }}</li>
-    <li>Repeat member rate: {{ metrics.repeat_member_rate|percent }}</li>
-    <li>Payment conversion: {{ metrics.payment_conversion|percent }}</li>
-    <li>Avg revenue per paid booking: {{ metrics.avg_revenue_cents_per_paid_booking|money }}</li>
+  <h1>Dashboard</h1>
+  <p class="hint">Last 7 Bangkok days, {{ period_from }} to {{ period_to }}. Money totals are on Payment's operator page.</p>
+  <ul class="cards" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
+      {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
+      {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
+    <li>Utilization<br><strong>{{ '%.1f' % (utilization * 100) }}%</strong></li>
+    <li>Members<br><strong>{{ members }}</strong></li>
+    {% for k, v in status.items() %}<li>{{ k|capitalize }}<br><strong>{{ v }}</strong></li>{% endfor %}
+    {% for k, v in hours.items() %}<li>Confirmed hours, {{ k }}<br><strong>{{ v }}</strong></li>{% endfor %}
   </ul>
-  <h2>Revenue per space</h2>
-  {% for bar in bars %}
-    <div class="bar-row">
-      <span class="bar-label">{{ bar.name }}</span>
-      <div class="bar" style="width: {{ bar.width }}%;"></div>
-      <span class="bar-value">{{ bar.revenue_cents|money }}</span>
-    </div>
-  {% else %}
-    <p>No spaces yet.</p>
-  {% endfor %}
-  <p><em>Figures come from test and load-test data, not real members.</em></p>
-  <p><a href="/">Back to spaces</a></p>
+  <form method="post" action="/operator/bookings/reconcile"><input type="hidden" name="return_to" value="dashboard"><button type="submit">Reconcile all held</button></form>
 {% endblock %}

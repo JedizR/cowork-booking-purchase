@@ -9,16 +9,25 @@
   <body>
     <nav class="site-nav">
       <a class="brand" href="/">Cowork Booking</a>
-      <a href="/dashboard">Business metrics</a>
-      <span class="spacer"></span>
-      {% if current_user_email %}
-        Logged in as {{ current_user_email }} ·
+      <a href="/">Spaces</a>
+      {% if me %}
         <a href="/bookings/mine">My bookings</a>
+        {% if me.is_operator %}
+          <a href="/operator/bookings">All bookings</a>
+          <a href="/operator/spaces">Spaces admin</a>
+          <a href="/operator/members">Members</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="{{ payment_public_url }}/operator">Payment totals</a>
+        {% endif %}
+        <span class="spacer"></span>
+        <span>{{ me.display_name }} ({{ me.email }})</span>
         <form method="post" action="/logout"><button type="submit">Log out</button></form>
       {% else %}
-        <a href="/register">Register</a> · <a href="/login">Log in</a>
+        <span class="spacer"></span>
+        <a href="/login">Log in</a> <a href="/register">Sign up</a>
       {% endif %}
     </nav>
+    {% for m in get_flashed_messages() %}<p class="message">{{ m }}</p>{% endfor %}
     {% block content %}{% endblock %}
   </body>
 </html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Spaces admin{% endblock %}
+{% block content %}
+  <h1>Spaces admin</h1>
+  {% if not rows %}<p>No spaces yet. Create one below.</p>{% endif %}
+  <ul class="list">
+    {% for s in rows %}
+      <li>
+        <strong>{{ s.name }} (room {{ s.id }})</strong>
+        {% if s.archived_at %}
+          <span class="hint">Archived {{ (s.archived_at|local_time)[:10] }}</span>
+        {% else %}
+          <form method="post" action="/operator/spaces/{{ s.id }}">
+            <input name="name" value="{{ s.name }}" required>
+            <label>Capacity <input type="number" name="capacity" value="{{ s.capacity }}" min="1" max="1000"></label>
+            <label>THB per hour <input type="number" name="hourly_rate" value="{{ s.hourly_rate_satang // 100 }}" min="0" max="10000"></label>
+            <button type="submit">Save</button>
+          </form>
+          <form method="post" action="/operator/spaces/{{ s.id }}/archive"><button type="submit">Archive</button></form>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  <h2>Create a space</h2>
+  <form method="post" action="/operator/spaces">
+    <input name="name" placeholder="Name" required>
+    <label>Capacity <input type="number" name="capacity" min="1" max="1000" required></label>
+    <label>THB per hour <input type="number" name="hourly_rate" min="0" max="10000" required></label>
+    <button type="submit">Create</button>
+  </form>
+{% endblock %}

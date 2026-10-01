@@ -5,8 +5,8 @@
 | Provider | Purchase (`cowork-booking-purchase`), port 8001 |
 | Consumers | The Member's and the Operator's browser; the e2e suite (`requests.Session`) |
 | State | proposed (M2 draft). Becomes agreed at M4 sign-off (tag `contract-v1`), verified by the M6 e2e run |
-| OpenAPI | [openapi/purchase.yaml](openapi/purchase.yaml) |
-| Outbound calls | Purchase → Payment ([purchase-payment.md](purchase-payment.md)); Purchase → Access ([purchase-access.md](purchase-access.md)) |
+| OpenAPI | [openapi.yaml](openapi.yaml) |
+| Outbound calls | Purchase → Payment ([purchase-payment.md](https://github.com/JedizR/cowork-booking-payment/blob/main/CONTRACT.md)); Purchase → Access ([purchase-access.md](https://github.com/JedizR/cowork-booking-access/blob/main/CONTRACT.md)) |
 | Decisions | D1-D5, D7-D11, D13-D20, D23, D24, D27, D28; ADR-0002, ADR-0004, ADR-0007, ADR-0009, ADR-0013, ADR-0014 |
 
 ## 1. Purpose and parties
@@ -276,7 +276,7 @@ Query `date` (YYYY-MM-DD, required) and `blocks` (1-8, required). Answers: 200 g
  ]}
 ```
 
-Three of the 24 entries, with BK-7KQ2M9 confirmed 09:00-10:30: 08:00 to 10:00 are Booked (3 blocks from 08:00 run to 09:30), 10:30 is free (the end is exclusive), 19:00 and 19:30 run past 20:00. The real answer always has 24 entries (the full example is in `openapi/purchase.yaml`). The grid is a read: it never reconciles and never holds a slot (PUR-R13).
+Three of the 24 entries, with BK-7KQ2M9 confirmed 09:00-10:30: 08:00 to 10:00 are Booked (3 blocks from 08:00 run to 09:30), 10:30 is free (the end is exclusive), 19:00 and 19:30 run past 20:00. The real answer always has 24 entries (the full example is in `openapi.yaml`). The grid is a read: it never reconciles and never holds a slot (PUR-R13).
 
 ### 8.3 POST /api/bookings
 
@@ -463,7 +463,7 @@ HTTP/1.1 201 Created
  "grant_status": "issued", "ticket_url": "http://localhost:8003/t/Zk7Pq2Wn9Tb4Xm6Rc3Lv8H"}
 ```
 
-The price is stored but never collected. The only outbound call was POST /grants to Access; its answer is the grant of the Access contract's example, ticket code M4TR-8WCE ([purchase-access.md](purchase-access.md), section 5.5). A Community Table booking (THB 0 per hour) gets `"coverage": "free"`, `"agreed_price_satang": 0` and the same shape. A later cancel refunds 0, calls only Access to revoke, and says "No payment was taken" (PUR-R30).
+The price is stored but never collected. The only outbound call was POST /grants to Access; its answer is the grant of the Access contract's example, ticket code M4TR-8WCE ([purchase-access.md](https://github.com/JedizR/cowork-booking-access/blob/main/CONTRACT.md), section 5.5). A Community Table booking (THB 0 per hour) gets `"coverage": "free"`, `"agreed_price_satang": 0` and the same shape. A later cancel refunds 0, calls only Access to revoke, and says "No payment was taken" (PUR-R30).
 
 ## 10. Timeouts and retries (outbound)
 
@@ -493,8 +493,8 @@ Purchase is the only caller (PUR-R35, ADR-0004):
 | `GET /operator/bookings` | Each row carries `data-booking-reference="BK-7KQ2M9"` and `data-flags` (space-separated: `being_prepared`, `revocation_pending`, `refund_pending`, `refund_failed`; empty when none); tests find their row by reference |
 | `GET /operator/members` | Each Member row is `<form method="post" action="/operator/members/<member_id>/plan" data-member-email="b@example.com" data-plan-active="false">`; tests find the row by email |
 | `GET /dashboard` | Always present, 0 when empty: `data-utilization="0.0104"` (the ratio, always 4 decimals, "0.0000"), `data-members="2"` (integer), `data-status-count-<status>="2"` for held, confirmed, expired and cancelled (integers), `data-hours-<coverage>="1.5"` for pay, plan and free (shortest decimal with no trailing zero: "2", "1.5", "0") (PUR-R34) |
-| Payment hosted page | `data-decline-code` ([purchase-payment.md](purchase-payment.md), section 8) |
-| Access e-ticket and kiosk | `data-ticket-code`, `data-status`, `data-result`, `data-selected-space-id`, `data-scan-result`, `data-scan-last4` ([purchase-access.md](purchase-access.md), section 8) |
+| Payment hosted page | `data-decline-code` ([purchase-payment.md](https://github.com/JedizR/cowork-booking-payment/blob/main/CONTRACT.md), section 8) |
+| Access e-ticket and kiosk | `data-ticket-code`, `data-status`, `data-result`, `data-selected-space-id`, `data-scan-result`, `data-scan-last4` ([purchase-access.md](https://github.com/JedizR/cowork-booking-access/blob/main/CONTRACT.md), section 8) |
 
 Only these Purchase markers exist in contract-v1.
 
