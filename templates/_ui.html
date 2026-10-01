@@ -38,17 +38,63 @@
   {%- endif -%}
 {%- endmacro %}
 
-{# The operator section's tabs (PUR-R06). #}
+{# The operator section's tabs (PUR-R06), with the same labels as the header menu. #}
 {% macro operator_nav(active) %}
   <div class="subnav">
     <div class="subnav-inner">
       <span class="subnav-title">Operator</span>
       <nav class="tabs" aria-label="Operator">
-        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "Bookings"), ("/operator/spaces", "spaces", "Spaces"), ("/operator/members", "members", "Members")] %}
-          <a href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>{{ label }}</a>
+        {% for href, key, label in [("/dashboard", "dashboard", "Dashboard"), ("/operator/bookings", "bookings", "All bookings"), ("/operator/spaces", "spaces", "Spaces admin"), ("/operator/members", "members", "Members")] %}
+          <a href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>{{ label }}{% if key == "bookings" and attention and attention.flagged %} <span class="tab-count" title="Bookings that need a person">{{ attention.flagged }}</span>{% endif %}</a>
         {% endfor %}
         <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
       </nav>
     </div>
   </div>
 {% endmacro %}
+
+{# The live-hold banner of the space page and My bookings (PUR-R39, PUR-R40). The title is the rule's sentence;
+   the actions are the two ways out: pay (only before the payment deadline) or cancel. #}
+{% macro hold_banner(hold, hold_text, seconds_left) %}
+  {% set open = not hold_text.startswith("Time to pay") %}
+  <div class="alert alert-strong hold-banner" role="status">
+    <span class="alert-icon" aria-hidden="true">!</span>
+    <p class="alert-title">{% if not open %}{{ hold_text }}{% else %}You have a held booking <a href="/bookings/{{ hold.reference }}" class="nowrap">{{ hold.reference }}</a>, {{ hold.space_name }} <span class="nowrap">{{ hold.start_at|local_time }}-{{ hold.end_at|hhmm }}</span>: pay by {{ (hold.hold_expires_at - pay_margin)|hhmm }} or cancel it{% endif %}.</p>
+    <p class="alert-body">{% if open %}{{ "Less than 1 min" if seconds_left < 60 else ((seconds_left + 59) // 60) ~ " min" }} left to pay. {% endif %}<span class="hold-why">One held booking at a time: pay for it or cancel it to book another time.</span></p>
+    <div class="alert-actions">
+      {% if open %}
+        <form method="post" action="/spaces/{{ hold.space_id }}/book" class="inline">
+          <input type="hidden" name="date" value="{{ (hold.start_at|local_time)[:10] }}">
+          <input type="hidden" name="start" value="{{ hold.start_at|hhmm }}">
+          <input type="hidden" name="blocks" value="{{ hold.blocks }}">
+          <input type="hidden" name="party_size" value="{{ hold.party_size }}">
+          <input type="hidden" name="note" value="{{ hold.note or '' }}">
+          <button class="btn btn-primary" type="submit">Continue to payment</button>
+        </form>
+      {% endif %}
+      <a class="btn btn-secondary" href="/bookings/{{ hold.reference }}/cancel">Cancel hold</a>
+    </div>
+  </div>
+{% endmacro %}
+
+{# One date-and-time form everywhere: "Sat 3 Oct · 14:00–15:00" (DESIGN principle 5). Rule texts that name a
+   time keep their own wording. #}
+{% macro when(b, day=True) %}{% if day %}{{ b.start_at|fdate }} · {% endif %}<span class="num nowrap">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span>{% endmacro %}
+
+{# "Today", "Tomorrow" or "Sat 3 Oct", against now. #}
+{% macro day_word(t, now) %}{% set d = t|fdate("full") %}{% if d == now|fdate("full") %}Today{% elif d == (now + one_day)|fdate("full") %}Tomorrow{% else %}{{ t|fdate }}{% endif %}{% endmacro %}
+
+{# The money state of a booking from stored fields (PUR-R19, PUR-R32, PUR-R34): plan and free are never revenue. #}
+{% macro money_state(b) -%}
+  {%- if b.coverage == "plan" -%}Plan · no charge
+  {%- elif b.coverage == "free" -%}Free
+  {%- elif b.status == "held" -%}Not paid
+  {%- elif b.status == "expired" -%}{{ "Paid after the hold" if b.payment_status == "paid" else "Not paid" }}
+  {%- elif b.status == "confirmed" -%}Paid
+  {%- elif b.payment_status != "paid" -%}Not paid
+  {%- elif b.refund_status == "succeeded" -%}Refunded
+  {%- elif b.refund_status == "pending" -%}Refund pending
+  {%- elif b.refund_status == "failed" -%}Refund failed
+  {%- elif b.refund_amount_satang == 0 -%}No refund (under 24 h)
+  {%- else -%}Paid{%- endif -%}
+{%- endmacro %}

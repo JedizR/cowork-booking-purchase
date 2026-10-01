@@ -14,11 +14,14 @@
       {{ ui.flashes() }}
       <div class="field">
         <label for="email">Email</label>
-        <input id="email" type="email" name="email" autocomplete="email" required autofocus>
+        <input id="email" type="email" name="email" autocomplete="email" value="{{ typed.email or '' }}" required{% if not typed.email %} autofocus{% endif %}>
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input id="password" type="password" name="password" autocomplete="current-password" required>
+        <div class="password">
+          <input id="password" type="password" name="password" autocomplete="current-password" required{% if typed.email %} autofocus{% endif %}>
+          <button class="password-toggle" type="button" data-show-password aria-controls="password" hidden>Show</button>
+        </div>
       </div>
       <button class="btn btn-primary btn-lg btn-block" type="submit">Log in</button>
     </form>

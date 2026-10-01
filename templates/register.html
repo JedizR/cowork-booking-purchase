@@ -14,16 +14,19 @@
       {{ ui.flashes() }}
       <div class="field">
         <label for="email">Email</label>
-        <input id="email" type="email" name="email" autocomplete="email" required autofocus>
+        <input id="email" type="email" name="email" autocomplete="email" value="{{ typed.email or '' }}" required autofocus>
       </div>
       <div class="field">
         <label for="display_name">Display name</label>
-        <input id="display_name" name="display_name" autocomplete="name" required maxlength="50" aria-describedby="name-help">
+        <input id="display_name" name="display_name" autocomplete="name" value="{{ typed.display_name or '' }}" required maxlength="50" aria-describedby="name-help">
         <p class="help" id="name-help">Up to 50 letters, digits or spaces. Shown next to your email.</p>
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input id="password" type="password" name="password" autocomplete="new-password" required minlength="8" aria-describedby="pw-help">
+        <div class="password">
+          <input id="password" type="password" name="password" autocomplete="new-password" required minlength="8" aria-describedby="pw-help">
+          <button class="password-toggle" type="button" data-show-password aria-controls="password" hidden>Show</button>
+        </div>
         <p class="help" id="pw-help">At least 8 characters.</p>
       </div>
       <button class="btn btn-primary btn-lg btn-block" type="submit">Sign up</button>

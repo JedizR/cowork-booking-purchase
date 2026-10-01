@@ -7,6 +7,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cowork Booking — {% block title %}{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8'/%3E%3Cpath d='M20.6 11.6a6 6 0 1 0 0 8.8' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -21,15 +22,15 @@
         <nav class="topnav-links" aria-label="Main">
           {{ nav("/", "Spaces", path == "/" or path.startswith("/spaces")) }}
           {% if me %}
-            {{ nav("/bookings/mine", "My bookings", path == "/bookings/mine") }}
+            {{ nav("/bookings/mine", "My bookings", path.startswith("/bookings") and not operator_view) }}
             {% if me.is_operator %}
-              {% set in_op = path == "/dashboard" or path.startswith("/operator") %}
+              {% set in_op = path == "/dashboard" or path.startswith("/operator") or operator_view %}
               <details class="topnav-menu">
-                <summary{% if in_op %} class="is-active"{% endif %}>Operator</summary>
+                <summary{% if in_op %} class="is-active"{% endif %}>Operator{% if attention and attention.flagged %} <span class="nav-count" title="Bookings that need a person">{{ attention.flagged }}</span>{% endif %}</summary>
                 <div class="topnav-menu-panel">
                   {{ nav("/dashboard", "Dashboard", path == "/dashboard") }}
-                  {{ nav("/operator/bookings", "All bookings", path == "/operator/bookings") }}
-                  {{ nav("/operator/spaces", "Spaces admin", path == "/operator/spaces") }}
+                  {{ nav("/operator/bookings", "All bookings", path == "/operator/bookings" or operator_view) }}
+                  {{ nav("/operator/spaces", "Spaces admin", path.startswith("/operator/spaces")) }}
                   {{ nav("/operator/members", "Members", path == "/operator/members") }}
                   <a href="{{ payment_public_url }}/operator">Payment totals <span aria-hidden="true">↗</span></a>
                 </div>
@@ -39,11 +40,18 @@
         </nav>
         <div class="topnav-right">
           {% if me %}
-            <span class="topnav-user" title="{{ me.display_name }} ({{ me.email }})"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }} ({{ me.email }})</span></span>
-            <form method="post" action="/logout"><button class="topnav-btn" type="submit">Log out</button></form>
+            {# One account menu: who is logged in (PUR-R02 shows the email), My bookings, and Log out as a POST (PUR-R37). #}
+            <details class="topnav-menu topnav-account">
+              <summary class="topnav-user" title="{{ me.display_name }} ({{ me.email }})"><span class="topnav-avatar" aria-hidden="true">{{ me.display_name[:1]|upper }}</span><span class="topnav-name">{{ me.display_name }} ({{ me.email }})</span><span class="visually-hidden">Account menu</span></summary>
+              <div class="topnav-menu-panel">
+                <p class="account-who"><strong>{{ me.display_name }}</strong><span>{{ me.email }}</span></p>
+                <a href="/bookings/mine">My bookings</a>
+                <form method="post" action="/logout"><button type="submit">Log out</button></form>
+              </div>
+            </details>
           {% else %}
-            <a class="topnav-link" href="/login">Log in</a>
-            <a class="topnav-btn topnav-btn-solid" href="/register">Sign up</a>
+            <a class="topnav-link" href="/login"{% if path == "/login" %} aria-current="page"{% endif %}>Log in</a>
+            <a class="topnav-btn{% if path != '/register' %} topnav-btn-solid{% endif %}" href="/register"{% if path == "/register" %} aria-current="page"{% endif %}>Sign up</a>
           {% endif %}
         </div>
       </div>

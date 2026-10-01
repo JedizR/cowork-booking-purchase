@@ -22,12 +22,13 @@
               {% if free %}<span class="badge badge-solid">Free</span>
               {% elif me and me.plan_active %}<span class="badge badge-solid">Plan covers this</span>{% endif %}
             </div>
-            <div class="space-card-mark space-card-initials"><b>{{ (s.name.split()|map("first")|join|upper)[:2] }}</b></div>
+            {# Capacity is the hero number (DESIGN: a typographic cover instead of a photo). #}
+            <div class="space-card-mark"><b>{{ s.capacity }}</b><span>{{ "person" if s.capacity == 1 else "people" }}</span></div>
           </div>
           <div class="space-card-body">
             <h2 class="space-card-title">{{ s.name }}</h2>
-            <p class="space-card-meta">Up to {{ s.capacity }} {{ "person" if s.capacity == 1 else "people" }}</p>
-            <p class="space-card-price">{% if free %}Free · THB 0.00 per hour{% else %}{{ s.hourly_rate_satang|money }} per hour, {{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min{% endif %}</p>
+            <p class="space-card-price">{% if free %}Free{% else %}{{ s.hourly_rate_satang|money }} per hour, {{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min{% endif %}</p>
+            <p class="space-card-meta">{% if s.next_free %}Next free: {{ ui.day_word(s.next_free, now) }} {{ s.next_free|hhmm }}{% else %}No free time today or tomorrow{% endif %}</p>
           </div>
         </a>
       {% endfor %}
