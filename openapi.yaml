@@ -4,7 +4,7 @@ info:
   version: contract-v1-draft
   description: |
     Provider Purchase, consumers the browser and the e2e suite. State proposed (M2 draft).
-    Contract text: ../purchase-public.md. Rules PUR-R01 to PUR-R40.
+    Contract text: CONTRACT.md. Rules PUR-R01 to PUR-R40.
     JSON routes use the purchase_session cookie set by POST /login (form).
     Anonymous: 401 (JSON) or 303 to /login (pages). An ended login (12 h, PUR-R03) is removed on the
     first request and flashed "Please log in again" once, then treated as anonymous: public pages and

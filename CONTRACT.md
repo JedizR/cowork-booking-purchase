@@ -5,7 +5,7 @@
 | Provider | Purchase (`cowork-booking-purchase`), port 8001 |
 | Consumers | The Member's and the Operator's browser; the e2e suite (`requests.Session`) |
 | State | proposed (M2 draft). Becomes agreed at M4 sign-off (tag `contract-v1`), verified by the M6 e2e run |
-| OpenAPI | [openapi/purchase.yaml](openapi/purchase.yaml) |
+| OpenAPI | [openapi.yaml](openapi.yaml) |
 | Outbound calls | Purchase → Payment ([purchase-payment.md](purchase-payment.md)); Purchase → Access ([purchase-access.md](purchase-access.md)) |
 | Decisions | D1-D5, D7-D11, D13-D20, D23, D24, D27, D28; ADR-0002, ADR-0004, ADR-0007, ADR-0009, ADR-0013, ADR-0014 |
 
@@ -276,7 +276,7 @@ Query `date` (YYYY-MM-DD, required) and `blocks` (1-8, required). Answers: 200 g
  ]}
 ```
 
-Three of the 24 entries, with BK-7KQ2M9 confirmed 09:00-10:30: 08:00 to 10:00 are Booked (3 blocks from 08:00 run to 09:30), 10:30 is free (the end is exclusive), 19:00 and 19:30 run past 20:00. The real answer always has 24 entries (the full example is in `openapi/purchase.yaml`). The grid is a read: it never reconciles and never holds a slot (PUR-R13).
+Three of the 24 entries, with BK-7KQ2M9 confirmed 09:00-10:30: 08:00 to 10:00 are Booked (3 blocks from 08:00 run to 09:30), 10:30 is free (the end is exclusive), 19:00 and 19:30 run past 20:00. The real answer always has 24 entries (the full example is in `openapi.yaml`). The grid is a read: it never reconciles and never holds a slot (PUR-R13).
 
 ### 8.3 POST /api/bookings
 
