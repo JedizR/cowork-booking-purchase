@@ -1,15 +1,61 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Dashboard{% endblock %}
+{% block subnav %}{{ ui.operator_nav("dashboard") }}{% endblock %}
 {% block content %}
-  <h1>Dashboard</h1>
-  <p class="hint">Last 7 Bangkok days, {{ period_from }} to {{ period_to }}. Money totals are on Payment's operator page.</p>
-  <ul class="cards" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
-      {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
-      {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
-    <li>Utilization<br><strong>{{ '%.1f' % (utilization * 100) }}%</strong></li>
-    <li>Members<br><strong>{{ members }}</strong></li>
-    {% for k, v in status.items() %}<li>{{ k|capitalize }}<br><strong>{{ v }}</strong></li>{% endfor %}
-    {% for k, v in hours.items() %}<li>Confirmed hours, {{ k }}<br><strong>{{ v }}</strong></li>{% endfor %}
-  </ul>
-  <form method="post" action="/operator/bookings/reconcile"><input type="hidden" name="return_to" value="dashboard"><button type="submit">Reconcile all held</button></form>
+  {% set total = status.values()|sum %}
+  {% set hours_total = hours.values()|map("float")|sum %}
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle num">Last 7 Bangkok days, {{ period_from|fdate }} to {{ period_to|fdate }}. Bookings count by their start; a lapsed hold counts as held until reconciled.</p>
+    </div>
+    <form method="post" action="/operator/bookings/reconcile" class="page-actions"><input type="hidden" name="return_to" value="dashboard"><button class="btn btn-secondary" type="submit">Reconcile all held</button></form>
+  </header>
+  <div class="dash" data-utilization="{{ '%.4f' % utilization }}" data-members="{{ members }}"
+       {% for k, v in status.items() %}data-status-count-{{ k }}="{{ v }}" {% endfor %}
+       {% for k, v in hours.items() %}data-hours-{{ k }}="{{ v }}" {% endfor %}>
+    <div class="grid-4">
+      <div class="stat">
+        <span class="stat-label">Bookings</span>
+        <span class="stat-value">{{ total }}</span>
+        <span class="stat-meta num">{{ status.confirmed }} confirmed · {{ status.held }} held</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Utilization</span>
+        <span class="stat-value">{{ '%.1f' % (utilization * 100) }}<small>%</small></span>
+        <progress class="progress" max="100" value="{{ '%.1f' % (utilization * 100) }}">{{ '%.1f' % (utilization * 100) }}%</progress>
+        <span class="stat-meta">of open hours, 08:00 to 20:00</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Members who booked</span>
+        <span class="stat-value">{{ members }}</span>
+        <span class="stat-meta">with a confirmed booking</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Confirmed hours</span>
+        <span class="stat-value">{{ hours_total|hours }}<small> h</small></span>
+        <span class="stat-meta">pay, plan and free</span>
+      </div>
+    </div>
+    <div class="grid-2 dash-charts">
+      <section class="card">
+        <div class="card-header"><h2 class="card-title">Bookings by status</h2><span class="card-meta num">{{ total }} total</span></div>
+        <ul class="bar-chart">
+          {% for k in ("confirmed", "held", "expired", "cancelled") %}
+            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track"><span class="bar{% if k in ('expired', 'cancelled') %} bar-muted{% endif %}" style="--value: {{ (status[k] / total * 100) if total else 0 }}%"></span></span><span class="bar-value">{{ status[k] }}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2 class="card-title">Confirmed hours by coverage</h2><span class="card-meta num">{{ hours_total|hours }} h</span></div>
+        <ul class="bar-chart">
+          {% for k in ("pay", "plan", "free") %}
+            <li class="bar-row"><span class="bar-label">{{ k|capitalize }}</span><span class="bar-track"><span class="bar" style="--value: {{ (hours[k]|float / hours_total * 100) if hours_total else 0 }}%"></span></span><span class="bar-value">{{ hours[k] }} h</span></li>
+          {% endfor %}
+        </ul>
+        <p class="fine dash-fine">Plan and free hours are not revenue. Money totals are on <a href="{{ payment_public_url }}/operator">Payment totals</a>.</p>
+      </section>
+    </div>
+  </div>
 {% endblock %}

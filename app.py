@@ -1001,7 +1001,15 @@ def create_app(database_url: str | None = None) -> Flask:
             if b["refund_status"] == "failed":
                 flags.append("refund_failed")
             b["flags"] = flags
-        return render_template("operator_bookings.html", rows=rows, now=now)
+        counts = {k: sum(1 for b in rows if b["status"] == k) for k in ("held", "confirmed", "expired", "cancelled")}
+        counts.update(all=len(rows), flagged=sum(1 for b in rows if b["flags"]))
+        status = request.args.get("status", "all")
+        status = status if status in counts else "all"
+        q = request.args.get("q", "").strip().upper()
+        shown = [b for b in rows if (status == "all" or b["status"] == status or (status == "flagged" and b["flags"]))
+                 and q in b["reference"]]
+        return render_template("operator_bookings.html", rows=shown, now=now, counts=counts, status=status, q=q,
+                               total=len(rows))
 
     def space_error(form, space_id=None) -> str | None:
         name = form.get("name", "").strip()
@@ -1022,7 +1030,9 @@ def create_app(database_url: str | None = None) -> Flask:
     def operator_spaces():
         require_operator()
         rows = app.db.execute("SELECT * FROM spaces ORDER BY archived_at IS NOT NULL, id").fetchall()
-        return render_template("operator_spaces.html", rows=rows)
+        edit = to_int(request.args.get("edit", ""))
+        editing = next((s for s in rows if s["id"] == edit and s["archived_at"] is None), None)
+        return render_template("operator_spaces.html", rows=rows, editing=editing)
 
     @app.post("/operator/spaces")
     def operator_space_create():

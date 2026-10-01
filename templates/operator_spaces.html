@@ -1,31 +1,70 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Spaces admin{% endblock %}
+{% block subnav %}{{ ui.operator_nav("spaces") }}{% endblock %}
 {% block content %}
-  <h1>Spaces admin</h1>
-  {% if not rows %}<p>No spaces yet. Create one below.</p>{% endif %}
-  <ul class="list">
-    {% for s in rows %}
-      <li>
-        <strong>{{ s.name }} (room {{ s.id }})</strong>
-        {% if s.archived_at %}
-          <span class="hint">Archived {{ (s.archived_at|local_time)[:10] }}</span>
-        {% else %}
-          <form method="post" action="/operator/spaces/{{ s.id }}">
-            <input name="name" value="{{ s.name }}" required>
-            <label>Capacity <input type="number" name="capacity" value="{{ s.capacity }}" min="1" max="1000"></label>
-            <label>THB per hour <input type="number" name="hourly_rate" value="{{ s.hourly_rate_satang // 100 }}" min="0" max="10000"></label>
-            <button type="submit">Save</button>
-          </form>
-          <form method="post" action="/operator/spaces/{{ s.id }}/archive"><button type="submit">Archive</button></form>
-        {% endif %}
-      </li>
-    {% endfor %}
-  </ul>
-  <h2>Create a space</h2>
-  <form method="post" action="/operator/spaces">
-    <input name="name" placeholder="Name" required>
-    <label>Capacity <input type="number" name="capacity" min="1" max="1000" required></label>
-    <label>THB per hour <input type="number" name="hourly_rate" min="0" max="10000" required></label>
-    <button type="submit">Create</button>
-  </form>
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Spaces admin</h1>
+      <p class="page-subtitle">The rooms members can book. A room is archived, never deleted, so its history stays.</p>
+    </div>
+    {% if editing %}<div class="page-actions"><a class="btn btn-secondary" href="/operator/spaces">New space</a></div>{% endif %}
+  </header>
+  {% if not rows %}
+    {% call ui.empty("No spaces yet. Create one below.", "", "room") %}{% endcall %}
+  {% else %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Space</th><th class="col-num">Capacity</th><th class="col-num">Rate</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+          {% for s in rows %}
+            <tr{% if editing and editing.id == s.id %} class="is-editing"{% endif %}>
+              <td><strong>{{ s.name }}</strong><span class="cell-sub">Room {{ s.id }}</span></td>
+              <td class="col-num">{{ s.capacity }}</td>
+              <td class="col-num">{% if s.hourly_rate_satang %}{{ s.hourly_rate_satang|money }} / h<span class="cell-sub">{{ ((s.hourly_rate_satang + 1) // 2)|money }} per 30 min</span>{% else %}Free{% endif %}</td>
+              <td>{% if s.archived_at %}<span class="badge badge-muted">Archived {{ (s.archived_at|local_time)[:10] }}</span>{% else %}<span class="badge badge-solid">Bookable</span>{% endif %}</td>
+              <td class="row-actions">
+                {% if not s.archived_at %}
+                  <a class="btn btn-utility" href="/operator/spaces?edit={{ s.id }}">Edit</a>
+                  <form method="post" action="/operator/spaces/{{ s.id }}/archive"><button class="btn btn-secondary btn-utility" type="submit">Archive</button></form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <div class="grid-2 spaces-forms">
+    <section class="card" id="space-form">
+      {% if editing %}
+        <div class="card-header"><h2 class="card-title">Edit {{ editing.name }}</h2><span class="card-meta">Room {{ editing.id }}</span></div>
+        <form method="post" action="/operator/spaces/{{ editing.id }}" class="stack stack-sm">
+          <div class="field"><label for="name">Name</label><input id="name" name="name" value="{{ editing.name }}" required></div>
+          <div class="form-row">
+            <div class="field"><label for="capacity">Capacity</label><input id="capacity" type="number" name="capacity" value="{{ editing.capacity }}" min="1" max="1000" inputmode="numeric"></div>
+            <div class="field"><label for="hourly_rate">THB per hour</label><input id="hourly_rate" type="number" name="hourly_rate" value="{{ editing.hourly_rate_satang // 100 }}" min="0" max="10000" inputmode="numeric"></div>
+          </div>
+          <p class="help">Existing bookings keep their price and party size; issued e-tickets keep the old name.</p>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-ghost" href="/operator/spaces">Cancel</a></div>
+        </form>
+      {% else %}
+        <div class="card-header"><h2 class="card-title">Create a space</h2></div>
+        <form method="post" action="/operator/spaces" class="stack stack-sm">
+          <div class="field"><label for="name">Name</label><input id="name" name="name" placeholder="Meeting Room A" required></div>
+          <div class="form-row">
+            <div class="field"><label for="capacity">Capacity</label><input id="capacity" type="number" name="capacity" min="1" max="1000" inputmode="numeric" required></div>
+            <div class="field"><label for="hourly_rate">THB per hour</label><input id="hourly_rate" type="number" name="hourly_rate" min="0" max="10000" inputmode="numeric" required></div>
+          </div>
+          <p class="help">Capacity 1 to 1,000 people. Rate 0 (free) or 20 to 10,000 THB per hour, in whole baht.</p>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Create</button></div>
+        </form>
+      {% endif %}
+    </section>
+    <section class="card card-parchment">
+      <div class="card-header"><h2 class="card-title">Archiving a room</h2></div>
+      <p class="caption">Archive works only when no held or confirmed booking ends after now; cancel those first. An archived room is hidden from members, keeps its bookings and cannot be edited or restored.</p>
+    </section>
+  </div>
 {% endblock %}

@@ -1,38 +1,68 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}All bookings{% endblock %}
+{% block subnav %}{{ ui.operator_nav("bookings") }}{% endblock %}
 {% block content %}
-  <h1>All bookings</h1>
-  <form method="post" action="/operator/bookings/reconcile"><input type="hidden" name="return_to" value="bookings"><button type="submit">Reconcile all held</button></form>
-  {% if not rows %}<p>No bookings yet</p>{% endif %}
-  <table>
-    <tr><th>Reference</th><th>Member</th><th>Space</th><th>Time</th><th>Status</th><th>Coverage</th><th>Price</th><th>Flags</th><th>Actions</th></tr>
-    {% for b in rows %}
-      <tr data-booking-reference="{{ b.reference }}" data-flags="{{ b.flags|join(' ') }}">
-        <td><a href="/bookings/{{ b.reference }}">{{ b.reference }}</a></td>
-        <td>{{ b.member_name }} ({{ b.member_email }})</td>
-        <td>{{ b.space_name }}</td>
-        <td>{{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</td>
-        <td>
-          {% if b.status == "held" %}
-            {% if now >= b.hold_expires_at %}held, hold ended {{ b.hold_expires_at|hhmm }} (Reconcile)
-            {% elif not b.payment_session_id %}held, payment not started
-            {% else %}held, pay by {{ (b.hold_expires_at - pay_margin)|hhmm }}{% endif %}
-          {% elif b.status == "confirmed" and now >= b.end_at %}Completed
-          {% else %}{{ b.status }}{% endif %}
-          {% if b.cancelled_at %}<br>Cancelled {{ b.cancelled_at|local_time }}{% endif %}
-        </td>
-        <td>{{ b.coverage }}</td>
-        <td>{{ b.agreed_price_satang|money }}</td>
-        <td>
-          {% for f in b.flags %}{{ {"being_prepared": "Being prepared", "revocation_pending": "Revocation pending", "refund_pending": "Refund pending", "refund_failed": "Refund failed"}[f] }}{% if not loop.last %}, {% endif %}{% endfor %}
-          {% if b.refund_requested_at and b.refund_status in ("pending", "failed") %}<br>Refund requested {{ b.refund_requested_at|local_time }}{% endif %}
-        </td>
-        <td>
-          {% if b.status == "held" or (b.status == "confirmed" and now < b.end_at) %}<a href="/bookings/{{ b.reference }}/cancel">Cancel</a>{% endif %}
-          {% if b.flags %}<form method="post" action="/operator/bookings/{{ b.reference }}/retry"><input type="hidden" name="return_to" value="bookings"><button type="submit">Retry</button></form>{% endif %}
-          {% if b.status == "held" %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile"><input type="hidden" name="return_to" value="bookings"><button type="submit">Reconcile</button></form>{% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </table>
+  {% set flag_badges = {"being_prepared": ("Being prepared", "badge-outline"), "revocation_pending": ("Revocation pending", "badge-outline"), "refund_pending": ("Refund pending", "badge-outline"), "refund_failed": ("Refund failed", "badge-attention")} %}
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">All bookings</h1>
+      <p class="page-subtitle">Rows that need a person come first, refunds owed oldest first, then the newest start.</p>
+    </div>
+    <form method="post" action="/operator/bookings/reconcile" class="page-actions"><input type="hidden" name="return_to" value="bookings"><button class="btn btn-secondary" type="submit">Reconcile all held</button></form>
+  </header>
+  {% if not total %}
+    {% call ui.empty("No bookings yet", "Bookings appear here as members make them.") %}{% endcall %}
+  {% else %}
+    <div class="toolbar">
+      <nav class="chip-row" aria-label="Filter by status">
+        {% for key, label in (("all", "All"), ("flagged", "Needs attention"), ("held", "Held"), ("confirmed", "Confirmed"), ("expired", "Expired"), ("cancelled", "Cancelled")) %}
+          <a class="chip" href="/operator/bookings{% if key != 'all' %}?status={{ key }}{% endif %}"{% if status == key %} aria-current="page"{% endif %}>{{ label }} <span class="chip-count num">{{ counts[key] }}</span></a>
+        {% endfor %}
+      </nav>
+      <form class="toolbar-search" method="get" action="/operator/bookings" role="search">
+        {% if status != "all" %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        <label class="visually-hidden" for="q">Search by reference</label>
+        <input class="search" id="q" name="q" value="{{ q }}" placeholder="Search BK- reference" autocomplete="off">
+      </form>
+    </div>
+    {% if not rows %}
+      {% call ui.empty("No bookings match", "Try another status or reference.", "search") %}<a class="btn btn-secondary" href="/operator/bookings">Clear filters</a>{% endcall %}
+    {% else %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Booking</th><th>When</th><th>Member</th><th>Status</th><th class="col-num">Price</th><th>Flags</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>
+            {% for b in rows %}
+              <tr data-booking-reference="{{ b.reference }}" data-flags="{{ b.flags|join(' ') }}"{% if b.flags %} class="is-flagged"{% endif %}>
+                <td><a href="/bookings/{{ b.reference }}">{{ b.reference }}</a><span class="cell-sub">{{ b.space_name }}</span></td>
+                <td><span class="num">{{ b.start_at|fdate }}</span><span class="cell-sub num" title="{{ b.start_at|local_time }}-{{ b.end_at|hhmm }}">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span></td>
+                <td class="cell-member">{{ b.member_name }}<span class="cell-sub">{{ b.member_email }}</span></td>
+                <td class="cell-wrap">
+                  {% if b.status == "held" %}
+                    <span class="badge badge-outline">Held</span>
+                    <span class="cell-sub">{% if now >= b.hold_expires_at %}held, hold ended {{ b.hold_expires_at|hhmm }} (Reconcile){% elif not b.payment_session_id %}held, payment not started{% else %}held, pay by {{ (b.hold_expires_at - pay_margin)|hhmm }}{% endif %}</span>
+                  {% else %}
+                    {{ ui.status_badge(b, now) }}
+                    {% if b.cancelled_at %}<span class="cell-sub">Cancelled <span class="nowrap">{{ b.cancelled_at|local_time }}</span></span>{% endif %}
+                  {% endif %}
+                </td>
+                <td class="col-num">{{ b.agreed_price_satang|money }}<span class="cell-sub">{{ b.coverage|capitalize }}</span></td>
+                <td class="cell-wrap">
+                  {% if b.flags %}<span class="cluster flag-list">{% for f in b.flags %}<span class="badge {{ flag_badges[f][1] }}">{{ flag_badges[f][0] }}</span>{% endfor %}</span>{% else %}<span class="muted">—</span>{% endif %}
+                  {% if b.refund_requested_at and b.refund_status in ("pending", "failed") %}<span class="cell-sub">Refund requested <span class="nowrap">{{ b.refund_requested_at|local_time }}</span></span>{% endif %}
+                </td>
+                <td class="row-actions">
+                  {% if b.flags %}<form method="post" action="/operator/bookings/{{ b.reference }}/retry"><input type="hidden" name="return_to" value="bookings"><button class="btn btn-primary btn-utility" type="submit">Retry</button></form>{% endif %}
+                  {% if b.status == "held" %}<form method="post" action="/operator/bookings/{{ b.reference }}/reconcile"><input type="hidden" name="return_to" value="bookings"><button class="btn btn-utility" type="submit">Reconcile</button></form>{% endif %}
+                  {% if b.status == "held" or (b.status == "confirmed" and now < b.end_at) %}<a class="btn btn-secondary btn-utility" href="/bookings/{{ b.reference }}/cancel">Cancel</a>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="fine table-foot">{{ rows|length }} of {{ total }} bookings. Times in Bangkok.</p>
+    {% endif %}
+  {% endif %}
 {% endblock %}

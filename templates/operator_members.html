@@ -1,21 +1,32 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}Members{% endblock %}
+{% block subnav %}{{ ui.operator_nav("members") }}{% endblock %}
 {% block content %}
-  <h1>Members</h1>
-  <table>
-    <tr><th>Email</th><th>Display name</th><th>Plan</th><th></th></tr>
-    {% for m in rows %}
-      <tr>
-        <td>{{ m.email }}{% if m.is_operator %} (operator){% endif %}</td>
-        <td>{{ m.display_name }}</td>
-        <td>{{ "on" if m.plan_active else "off" }}</td>
-        <td>
-          <form method="post" action="/operator/members/{{ m.id }}/plan" data-member-email="{{ m.email }}" data-plan-active="{{ 'true' if m.plan_active else 'false' }}">
-            <input type="hidden" name="plan_active" value="{{ 'false' if m.plan_active else 'true' }}">
-            <button type="submit">{{ "Turn plan off" if m.plan_active else "Turn plan on" }}</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-  </table>
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Members</h1>
+      <p class="page-subtitle">With a plan on, a member books without paying. Only bookings made after a change use it.</p>
+    </div>
+  </header>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Plan</th></tr></thead>
+      <tbody>
+        {% for m in rows %}
+          <tr>
+            <td><strong>{{ m.display_name }}</strong><span class="cell-sub">{{ m.email }}</span></td>
+            <td>{% if m.is_operator %}<span class="badge badge-solid">Operator</span>{% else %}<span class="muted">Member</span>{% endif %}</td>
+            <td class="num">{{ m.created_at|fdate("full") }}</td>
+            <td>
+              <form method="post" action="/operator/members/{{ m.id }}/plan" data-member-email="{{ m.email }}" data-plan-active="{{ 'true' if m.plan_active else 'false' }}">
+                <input type="hidden" name="plan_active" value="{{ 'false' if m.plan_active else 'true' }}">
+                <button class="switch switch-btn" type="submit" role="switch" aria-checked="{{ 'true' if m.plan_active else 'false' }}" aria-label="Plan for {{ m.email }}" title="{{ 'Turn plan off' if m.plan_active else 'Turn plan on' }}"><span class="switch-track"></span><span class="switch-text">{{ "On" if m.plan_active else "Off" }}</span></button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endblock %}
