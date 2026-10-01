@@ -80,10 +80,10 @@
     var refund = $("#bar-refund"), hint = $("#range-hint"), clear = $("#bar-clear"), details = $("#details");
     var startIn = form.elements.start, blocksIn = form.elements.blocks, anon = form.dataset.anon === "1";
     var rate = +form.dataset.rate, coverage = form.dataset.coverage, day = form.dataset.day, date = form.dataset.date;
-    var now = Date.parse(form.dataset.now), hold = form.dataset.hold || "", holdMatch = form.dataset.holdMatch || "";
+    var now = Date.parse(form.dataset.now), hold = form.dataset.hold || "";
     var narrow = window.matchMedia("(max-width: 833px)"), label = btn.textContent, reviewed = false, MAX = 8;
     if (narrow.matches) title.textContent = "Tap a start time";
-    if (hold && !holdMatch && !anon) title.textContent = "Finish " + hold + " first";
+    if (hold) title.textContent = "Finish " + hold + " first";
     var idle = [title.textContent, meta.textContent];
     startIn.disabled = false;
     if (!root) { btn.disabled = !anon || !!hold; return; }
@@ -161,10 +161,11 @@
       });
       var last = pv !== null ? pv : end, n = start === null ? 0 : last - start + 1;
       bar.classList.toggle("is-idle", start === null);
+      bar.classList.toggle("is-ref-title", !!hold && start === null);  // a reference, not a time: no tabular hyphen
       bar.classList.toggle("is-preview", pv !== null);
       clear.hidden = start === null;
       if (start === null) {
-        title.textContent = idle[0]; meta.textContent = idle[1]; startIn.value = ""; refund.hidden = true;
+        title.textContent = idle[0]; meta.textContent = idle[1]; startIn.value = ""; blocksIn.value = dflt; refund.hidden = true;
       } else {
         var price = Math.floor((rate * n + 1) / 2);  // round_half_up(rate x blocks / 2), PUR-R17
         title.textContent = day + " · " + from(start) + "–" + until(last);
@@ -177,12 +178,12 @@
         refund.hidden = false;
         startIn.value = from(start); blocksIn.value = end - start + 1;
       }
-      // PUR-R39: with a live hold only the held space, start and blocks can be sent (it resumes the hold).
-      var match = holdMatch && start !== null && holdMatch === date + " " + from(start) + " " + (end - start + 1);
-      if (hold && !match && !anon) { btn.disabled = true; btn.textContent = "Finish " + hold + " first"; }
+      // PUR-R39: with a live hold every other request is refused; the banner resumes or cancels the hold, and
+      // the hold's own blocks read "Booked · yours" here.
+      if (hold) { btn.disabled = true; btn.textContent = "Finish " + hold + " first"; }
       else {
         btn.disabled = !anon && start === null;
-        btn.textContent = !anon && narrow.matches && !reviewed && start !== null && !match ? "Review details" : label;
+        btn.textContent = !anon && narrow.matches && !reviewed && start !== null ? "Review details" : label;
       }
       hint.textContent = note || (anon && start !== null ? "After you log in, tap your start time again; we keep the date and length."
         : picking ? "Select an end time, or keep 30 min" : "");

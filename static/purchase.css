@@ -131,6 +131,7 @@
   border-radius: 50%; border: 1.5px solid var(--ink); box-sizing: border-box; color: var(--ink); font-size: 10px; font-weight: 700;
 }
 .sticky-bar.is-preview .sticky-bar-title, .sticky-bar.is-preview .sticky-bar-meta { color: var(--muted); }
+.sticky-bar.is-ref-title .sticky-bar-title { font-variant-numeric: normal; }
 .sticky-bar .btn:disabled { opacity: 1; }
 .sticky-bar-clear { min-height: 52px; }
 .noscript-duration { display: flex; align-items: flex-end; gap: var(--sp-4); margin-bottom: var(--sp-5); }
