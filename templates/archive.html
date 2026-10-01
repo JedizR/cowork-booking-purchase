@@ -19,7 +19,7 @@
               <div class="date-tile" aria-hidden="true"><span class="date-tile-month">{{ b.start_at|fdate("mon") }}</span><span class="date-tile-day">{{ b.start_at|fdate("day") }}</span></div>
               <div>
                 <p class="list-item-title"><a href="/bookings/{{ b.reference }}">{{ b.reference }}</a></p>
-                <p class="list-item-meta">{{ ui.when(b) }} · {{ b.member_name }}</p>
+                <p class="list-item-meta meta"><span class="nowrap">{{ b.start_at|fdate }}</span>{{ ui.times(b) }}<span>{{ b.member_name }}</span></p>
               </div>
               <div class="list-item-aside"><span class="badge {{ 'badge-outline' if b.status == 'held' else 'badge-solid' }}">{{ b.status|capitalize }}</span></div>
             </li>

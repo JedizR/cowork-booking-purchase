@@ -35,10 +35,10 @@
             <div class="date-tile" aria-hidden="true"><span class="date-tile-month">{{ b.start_at|fdate("mon") }}</span><span class="date-tile-day">{{ b.start_at|fdate("day") }}</span></div>
             <div>
               <p class="list-item-title"><a href="/bookings/{{ b.reference }}">{{ b.space_name }}</a></p>
-              <p class="list-item-meta">{{ ui.day_word(b.start_at, now) }} · <span class="num">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span> · <span class="nowrap">{{ b.reference }}</span></p>
+              <p class="list-item-meta meta"><span class="nowrap">{{ ui.day_word(b.start_at, now) }}</span>{{ ui.times(b) }}<span class="nowrap">{{ b.reference }}</span></p>
               <p class="list-item-meta list-item-money">
-                {%- if b.coverage == "plan" %}Covered by your plan
-                {%- elif b.coverage == "free" %}Free
+                {%- if b.coverage == "plan" %}Covered by your plan · no payment
+                {%- elif b.coverage == "free" %}Free · no payment
                 {%- elif b.status == "held" %}{{ b.agreed_price_satang|money }} · not paid yet
                 {%- elif b.status == "confirmed" %}{{ b.agreed_price_satang|money }} paid
                 {%- elif b.payment_status != "paid" %}Nothing was charged

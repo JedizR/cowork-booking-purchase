@@ -7,10 +7,9 @@
   <a class="back-link" href="/bookings/{{ b.reference }}">Back to booking</a>
   <section class="card confirm-card">
     <p class="eyebrow">Cancel booking</p>
-    {# The title is the PUR-R30 sentence word for word; the line under it says the same time the way every page does. #}
-    <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }} <span class="nowrap">{{ b.start_at|local_time }}-{{ b.end_at|hhmm }}</span></h1>
-    <p class="confirm-when">{{ b.start_at|fdate("long") }} · <span class="num nowrap">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span> · {{ b.blocks|duration }}</p>
-    {% if by_operator %}<p class="confirm-member">{{ b.member_name }} ({{ b.member_email }})</p>{% endif %}
+    {# The PUR-R30 title names the booking, with the time the way every page says it. #}
+    <h1 class="confirm-title">Cancel {{ b.reference }}, {{ b.space_name }}, {{ ui.when(b) }}</h1>
+    <p class="meta confirm-when"><span>{{ b.blocks|duration }}</span><span>Party of {{ b.party_size }}</span>{% if by_operator %}<span>{{ b.member_name }} ({{ b.member_email }})</span>{% endif %}</p>
 
     <div class="summary confirm-summary">
       <h2 class="summary-title">What happens</h2>

@@ -157,3 +157,26 @@ def test_add_to_calendar_reads_the_stored_booking(app):
     body = r.get_data(as_text=True)
     assert r.mimetype == "text/calendar" and "DTSTART:20261007T020000Z\r\n" in body and "DTEND:20261007T033000Z" in body
     assert f"UID:{ref}@cowork-booking" in body and "SUMMARY:Community Table" in body
+
+
+def words(html):
+    return " ".join(re.sub(r"<[^>]+>", " ", html).split())
+
+
+def test_pur_r23_payment_description_is_the_room_and_the_human_bangkok_time(app, pay):
+    a = member(app)
+    sid = book_json(a).get_json()["payment_session_id"]  # Meeting Room A, Wed 7 Oct 09:00, 3 blocks
+    assert pay.sessions[sid]["description"] == "Meeting Room A · Wed 7 Oct · 09:00–10:30"  # no name, no email
+
+
+def test_times_read_one_way_on_the_cancel_screen_and_the_booking_page(app, pay):
+    op, a = member(app, "operator@example.com", "Op"), member(app)
+    ref = book_json(a).get_json()["reference"]
+    screen = words(a.get(f"/bookings/{ref}/cancel").get_data(as_text=True))
+    assert f"Cancel {ref}, Meeting Room A, Wed 7 Oct · 09:00–10:30" in screen
+    pay.pay(ref)
+    assert "Cancel by Tue 6 Oct, 09:00 for a full refund." in words(a.get(f"/bookings/{ref}").get_data(as_text=True))
+    set_clock(a, "2026-10-05T11:30:00+07:00")
+    a.post(f"/api/bookings/{ref}/cancel", json={})
+    assert "Mon 5 Oct, 11:30" in words(op.get("/operator/bookings?when=any").get_data(as_text=True))
+

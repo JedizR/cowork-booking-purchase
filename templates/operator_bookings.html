@@ -46,7 +46,7 @@
               {% set pay_by = b.hold_expires_at - pay_margin if b.hold_expires_at else None %}
               <tr data-booking-reference="{{ b.reference }}" data-flags="{{ b.flags|join(' ') }}"{% if b.flags %} class="is-flagged"{% endif %}>
                 <td><a class="cell-title" href="/bookings/{{ b.reference }}">{{ b.reference }}</a><span class="cell-sub">{{ b.space_name }}</span></td>
-                <td class="cell-when"><span class="num">{{ ui.day_word(b.start_at, now) }}</span><span class="cell-sub num">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }}</span></td>
+                <td class="cell-when"><span class="nowrap">{{ ui.day_word(b.start_at, now) }}</span><span class="cell-sub">{{ ui.times(b) }}</span></td>
                 <td class="cell-member">{{ b.member_name }}<span class="cell-sub">{{ b.member_email }}</span></td>
                 <td class="cell-state cell-wrap">
                   {%- if b.status == "held" -%}
@@ -56,11 +56,11 @@
                   {%- elif b.status == "confirmed" -%}<span class="badge badge-solid">Confirmed</span>{% if now >= b.start_at %}<span class="cell-sub">In progress</span>{% endif %}
                   {%- else -%}
                     <span class="badge badge-muted">{{ b.status|capitalize }}</span>
-                    {% if b.cancelled_at %}<span class="cell-sub nowrap">{{ b.cancelled_at|fdate }}, {{ b.cancelled_at|hhmm }}{% if b.cancel_reason == "operator_cancel" %} · by operator{% endif %}</span>{% endif %}
+                    {% if b.cancelled_at %}<span class="cell-sub"><span class="nowrap">{{ b.cancelled_at|at }}</span>{% if b.cancel_reason == "operator_cancel" %} · by operator{% endif %}</span>{% endif %}
                   {%- endif -%}
                   {% if b.flags %}
                     <span class="flag-list">{% for f in b.flags %}<span class="badge {{ flag_badges[f][1] }}">{{ flag_badges[f][0] }}</span>{% endfor %}</span>
-                    {% if b.refund_requested_at and b.refund_status in ("pending", "failed") %}<span class="cell-sub">Refund asked {{ b.refund_requested_at|fdate }}, {{ b.refund_requested_at|hhmm }}{% if b.refund_attempt %} · attempt {{ b.refund_attempt }}{% endif %}</span>{% endif %}
+                    {% if b.refund_requested_at and b.refund_status in ("pending", "failed") %}<span class="cell-sub">Refund asked <span class="nowrap">{{ b.refund_requested_at|at }}</span>{% if b.refund_attempt %} · attempt {{ b.refund_attempt }}{% endif %}</span>{% endif %}
                   {% endif %}
                 </td>
                 <td class="col-num cell-money">

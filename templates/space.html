@@ -18,11 +18,11 @@
       <div>
         <p class="eyebrow">Room {{ space.id }}</p>
         <h1 class="page-title">{{ space.name }}</h1>
-        <p class="space-facts">
+        <p class="space-facts meta">
           <span>Up to {{ space.capacity }} {{ "person" if space.capacity == 1 else "people" }}</span>
           {% if coverage == "free" %}<span>Free</span>
-          {% else %}<span class="num">{{ space.hourly_rate_satang|money }} per hour</span>{% endif %}
-          {% if coverage == "plan" %}<span class="badge badge-solid">Covered by your plan</span>{% endif %}
+          {% else %}<span class="num nowrap">{{ space.hourly_rate_satang|money }} per hour</span>{% endif %}
+          {% if coverage == "plan" %}<span><span class="badge badge-solid">Covered by your plan</span></span>{% endif %}
         </p>
       </div>
     </header>

@@ -78,9 +78,7 @@
 .space-header { margin-bottom: var(--sp-5); }
 .page-space { padding-bottom: 0; }
 .page-space + .footer { margin-top: 0; }
-.space-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-callout); }
-.space-facts > span:not(.badge) + span:not(.badge)::before { content: "·"; margin: 0 var(--sp-2); }
-.space-facts .badge { margin-left: var(--sp-3); }
+.space-facts { margin-top: var(--sp-2); color: var(--muted); font-size: var(--fs-callout); align-items: center; }
 .hold-banner { margin-bottom: var(--sp-6); }
 .hold-banner .alert-title a { color: inherit; }
 .picker { margin-bottom: var(--sp-7); }
@@ -231,8 +229,7 @@
 /* ---- Cancel and archive confirm ---- */
 .confirm-card { padding: var(--sp-6); }
 .confirm-title { margin: var(--sp-2) 0 0; font-size: var(--fs-heading); line-height: 1.22; letter-spacing: -0.018em; }
-.confirm-when { margin: var(--sp-2) 0 0; color: var(--ink-80); font-size: var(--fs-callout); }
-.confirm-member { margin: var(--sp-2) 0 0; color: var(--muted); }
+.confirm-when { margin-top: var(--sp-2); color: var(--ink-80); font-size: var(--fs-callout); }
 .confirm-summary { margin-top: var(--sp-5); }
 .confirm-refund { margin: 0 0 var(--sp-3); font-size: var(--fs-tagline); font-weight: 600; line-height: 1.3; letter-spacing: -0.012em; font-variant-numeric: tabular-nums; }
 .confirm-refund.is-long { font-size: var(--fs-body); font-weight: 400; line-height: 1.45; letter-spacing: -0.01em; }

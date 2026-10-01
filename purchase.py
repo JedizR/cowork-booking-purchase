@@ -114,6 +114,17 @@ def fdate(value, style: str = "short") -> str:
             "month": f"{d:%B} {d.year}", "dow": f"{d:%a}", "mon": f"{d:%b}"}.get(style, f"{d:%a} {d.day} {d:%b}")
 
 
+def fwhen(start: datetime, end: datetime) -> str:
+    """The one date-and-time form of every page and of the payment description: "Sat 3 Oct · 09:00–11:00"."""
+    s, e = start.astimezone(BKK), end.astimezone(BKK)
+    return f"{fdate(s)} · {s:%H:%M}–{e:%H:%M}"
+
+
+def fat(t: datetime) -> str:
+    """A moment in a sentence: "Fri 2 Oct, 09:00" (Bangkok)."""
+    return f"{fdate(t)}, {t.astimezone(BKK):%H:%M}"
+
+
 def duration_text(blocks: int) -> str:
     h, m = divmod(blocks * 30, 60)
     return " ".join(p for p in (f"{h} h" if h else "", f"{m} min" if m else "") if p)
@@ -123,4 +134,7 @@ if __name__ == "__main__":
     assert price_satang(30000, 3) == 45000 and price_satang(2000, 1) == 1000
     assert money(123450) == "THB 1,234.50" and hours_text(1.5) == "1.5" and hours_text(2) == "2"
     assert fdate(date(2026, 10, 7), "long") == "Wednesday, 7 October" and fdate(date(2026, 10, 7)) == "Wed 7 Oct"
+    at = datetime(2026, 10, 3, 2, 0, tzinfo=timezone.utc)  # 09:00 Bangkok
+    assert fwhen(at, at + 4 * BLOCK) == "Sat 3 Oct · 09:00–11:00"
+    assert fat(at - timedelta(hours=24)) == "Fri 2 Oct, 09:00"
     print("ok")

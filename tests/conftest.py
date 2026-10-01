@@ -35,7 +35,8 @@ class FakePayment:
         sid = f"ps_{len(self.sessions) + 1:022d}"
         self.sessions[sid] = {"id": sid, "url": f"http://localhost:8002/pay/{sid}", "status": "open",
                               "payment_status": "unpaid", "amount_satang": amount_satang, "currency": "THB",
-                              "booking_reference": booking_reference, "expires_at": expires_at.isoformat()}
+                              "booking_reference": booking_reference, "expires_at": expires_at.isoformat(),
+                              "description": description}
         return dict(self.sessions[sid])
 
     def get_session(self, sid):

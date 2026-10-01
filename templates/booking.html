@@ -109,7 +109,7 @@
               {%- if op %}Operator cancel: full refund until {{ b.end_at|hhmm }}
               {%- elif started %}This booking has started; ask the operator
               {%- elif b.coverage != "pay" %}You can cancel until the start.
-              {%- elif b.start_at - now >= one_day %}Cancel by {{ full_refund_by|local_time }} for a full refund.
+              {%- elif b.start_at - now >= one_day %}Cancel by <span class="nowrap">{{ full_refund_by|at }}</span> for a full refund.
               {%- else %}No refund if you cancel: the start is less than 24 h away.{% endif -%}
               </span>
             {% endcall %}
@@ -177,8 +177,7 @@
         <div class="card-header"><h2 class="card-title">Booking details</h2></div>
         <dl class="dl">
           <dt>Space</dt><dd>{{ b.space_name }}</dd>
-          <dt>Date</dt><dd>{{ b.start_at|fdate("longyear") }}</dd>
-          <dt>Time</dt><dd class="num">{{ b.start_at|hhmm }}–{{ b.end_at|hhmm }} · {{ b.blocks|duration }}</dd>
+          <dt>When</dt><dd><span class="nowrap">{{ b.start_at|fdate("full") }}</span> · {{ ui.times(b) }} · <span class="nowrap">{{ b.blocks|duration }}</span></dd>
           <dt>Party</dt><dd>Party of {{ b.party_size }}</dd>
           {% if b.note %}<dt>Note</dt><dd>{{ b.note }}</dd>{% endif %}
           <dt>Reference</dt><dd>{{ b.reference }}</dd>
@@ -193,7 +192,7 @@
           <dl class="dl">
             <dt>Member</dt><dd>{{ b.member_name }} (<a href="mailto:{{ b.member_email }}">{{ b.member_email }}</a>)</dd>
             <dt>Coverage</dt><dd>{{ b.coverage|capitalize }}</dd>
-            {% if b.cancelled_at %}<dt>Cancelled</dt><dd>{{ b.cancelled_at|local_time }}</dd>{% endif %}
+            {% if b.cancelled_at %}<dt>Cancelled</dt><dd>{{ b.cancelled_at|at }}</dd>{% endif %}
             {% if b.refund_attempt %}<dt>Refund attempt</dt><dd class="num">{{ b.refund_attempt }} · {{ b.refund_status }}</dd>{% endif %}
             {% if b.payment_session_id %}<dt>Payment session</dt><dd class="mono">{{ b.payment_session_id }}</dd>{% endif %}
           </dl>
@@ -228,7 +227,7 @@
         <section class="summary">
           <h2 class="summary-title">Cancellation</h2>
           {% if b.start_at - now >= one_day %}
-            <p class="caption">Once paid, full refund if you cancel 24 h or more before the start, so until <strong class="num nowrap">{{ full_refund_by|fdate }}, {{ full_refund_by|hhmm }}</strong>. After that, no refund.</p>
+            <p class="caption">Once paid, full refund if you cancel 24 h or more before the start, so until <strong class="num nowrap">{{ full_refund_by|at }}</strong>. After that, no refund.</p>
           {% else %}
             <p class="caption">The start is less than 24 h away, so once paid this booking cannot be refunded.</p>
           {% endif %}

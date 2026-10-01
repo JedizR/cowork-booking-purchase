@@ -17,7 +17,7 @@ import access_client
 import clock
 import payment_client
 from payment_client import CallFailed
-from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, fdate, grid,
+from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, fat, fdate, fwhen, grid,
                       hours_text, money, month, new_reference, price_satang, refund_policy, shape_error,
                       today, window_error)
 
@@ -334,7 +334,7 @@ def start_session(b) -> str:
     try:
         s = payment_client.create_session(
             b["reference"], b["agreed_price_satang"],
-            f"{b['space_name']}, {local_time(b['start_at'])}-{hhmm(b['end_at'])}",
+            f"{b['space_name']} · {fwhen(b['start_at'], b['end_at'])}",  # space and Bangkok time only, PUR-R23
             f"{public}/bookings/{b['reference']}/return", f"{public}/bookings/{b['reference']}", deadline(b).astimezone(BKK))
     except CallFailed:
         raise Refusal(503, "payment_unreachable", "Payment is not reachable. Please try again.",
@@ -589,6 +589,7 @@ def create_app(database_url: str | None = None) -> Flask:
     app.add_template_filter(money, "money")
     app.add_template_filter(duration_text, "duration")
     app.add_template_filter(fdate, "fdate")
+    app.add_template_filter(fat, "at")
     app.add_template_filter(hours_text, "hours")
     app.add_template_filter(flash_kind, "flash_kind")
 
