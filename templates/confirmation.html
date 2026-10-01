@@ -4,24 +4,6 @@
   <h1>Booking #{{ booking.id }}</h1>
   <p>{{ booking.space_name }} for {{ booking.member }}</p>
   <p>{{ booking.start_time|local_time }} to {{ booking.end_time|local_time }} (Bangkok time)</p>
-  {% if booking.paid %}
-    <p>Paid. Total: {{ booking.amount_cents|money }}{% if booking.card_last4 %} (card ending {{ booking.card_last4 }}){% endif %}</p>
-    <form method="post" action="/bookings/{{ booking.id }}/confirmation/unlock">
-      <button type="submit">Unlock</button>
-    </form>
-  {% else %}
-    <p>Not paid yet - total {{ booking.amount_cents|money }}, pay to get your access code.</p>
-    <form method="post" action="/bookings/{{ booking.id }}/confirmation/pay">
-      <input name="card_number" placeholder="Card number (mocked, e.g. 4242424242424242)" required>
-      <input name="expiry" placeholder="MM/YY" required>
-      <input name="cvc" placeholder="CVC" required>
-      <button type="submit">Pay</button>
-    </form>
-  {% endif %}
-  {% if code %}
-    <p>Your access code: <strong>{{ code }}</strong></p>
-  {% elif error %}
-    <p class="message">{{ error }}</p>
-  {% endif %}
+  <p>Total: {{ booking.amount_cents|money }}</p>
   <p><a href="/">Back to spaces</a></p>
 {% endblock %}

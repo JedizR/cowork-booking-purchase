@@ -1,732 +1,1533 @@
 openapi: 3.0.3
 info:
-  title: Spacey API
-  description: >
-    A space booking system: find a space, book it, pay once or subscribe,
-    and get access through a mocked lock.
-
-
-    This document covers the JSON API only. A few routes render HTML pages
-    for a browser instead (the space list at `/`, the booking form's target
-    `POST /spaces/{spaceId}/book`, the booking confirmation page and its
-    Pay/Unlock buttons, and `/dashboard`) and are not listed here.
-  version: "1.0"
+  title: Cowork Booking Purchase public API
+  version: contract-v1-draft
+  description: |
+    Provider Purchase, consumers the browser and the e2e suite. State proposed (M2 draft).
+    Contract text: ../purchase-public.md. Rules PUR-R01 to PUR-R40.
+    JSON routes use the purchase_session cookie set by POST /login (form).
+    Anonymous: 401 (JSON) or 303 to /login (pages). An ended login (12 h, PUR-R03) is removed on the
+    first request and flashed "Please log in again" once, then treated as anonymous: public pages and
+    GET /api/spaces* still answer, and POST /login and POST /register always run.
+    Not the owner or not an operator: 404.
+    JSON errors: {"error": {"code": "...", "message": "..."}}. Money is integer satang, THB.
+    Times are ISO 8601 with an offset; answers use +07:00. Form posts answer 303 with a
+    flashed message; no text from the URL is ever shown. v1 has no JSON route for
+    sign-up, login, operator work, plans, the dashboard or a refund retry: those are
+    form routes, and an unknown /api path gets 404.
+    Browser form bodies (application/x-www-form-urlencoded) and page query values carry no
+    schema constraints on purpose: a missing or invalid field answers 303 with the flash the
+    operation names, never 400, so field rules live in the descriptions.
 servers:
-  - url: /
-    description: Same host the app is running on (local, container, or the deployed URL).
-
+  - url: http://localhost:8001
+    description: Public URL (PUBLIC_URL)
 tags:
-  - name: spaces
-  - name: bookings
-  - name: members
-  - name: accounts
-    description: Registration and login. See issue #120.
-  - name: operations
-    description: Health and business metrics.
-
+  - name: api
+    description: JSON API, cookie purchase_session
+  - name: pages
+    description: HTML pages and forms for the Member
+  - name: operator
+    description: HTML pages and forms for the Operator (is_operator)
+  - name: ops
+    description: Health and the test clock
 paths:
-  /health:
+  /api/spaces:
     get:
-      tags: [operations]
-      summary: Check the app and database are reachable.
+      tags: [api]
+      operationId: listSpaces
+      security: []
+      summary: Non-archived spaces
+      description: Rules PUR-R15, PUR-R16, PUR-R18.
       responses:
-        "200":
-          description: Healthy.
+        '200':
+          description: Spaces
           content:
             application/json:
               schema:
                 type: object
-                properties:
-                  status: { type: string, enum: [ok] }
-                  revision:
-                    type: string
-                    description: The `APP_REVISION` environment variable, or `local` if unset.
-                required: [status, revision]
-        "503":
-          description: The database is unreachable.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, enum: [error] }
-                  error: { type: string, example: database unreachable }
-                required: [status, error]
-
-  /spaces:
-    get:
-      tags: [spaces]
-      summary: List every space.
-      description: >
-        `available` normally reflects this exact instant. Pass `start_time`
-        and `end_time` together to check availability for a specific window
-        instead - the same back-to-back-is-fine overlap rule booking uses.
-      parameters:
-        - $ref: "#/components/parameters/StartTime"
-        - $ref: "#/components/parameters/EndTime"
-      responses:
-        "200":
-          description: The full space list.
-          content:
-            application/json:
-              schema:
-                type: object
+                required: [spaces]
                 properties:
                   spaces:
                     type: array
-                    items: { $ref: "#/components/schemas/Space" }
-                required: [spaces]
-        "400":
-          $ref: "#/components/responses/BadWindow"
-    post:
-      tags: [spaces]
-      summary: Create a space.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name: { type: string, example: Meeting Room A }
-                capacity:
-                  type: integer
-                  minimum: 1
-                  example: 6
-                price_cents:
-                  type: integer
-                  minimum: 0
-                  default: 0
-                  description: >
-                    Per-hour rate. A booking is charged this rate times the
-                    hours booked, rounded to whole cents.
-                  example: 1500
-              required: [name, capacity]
-      responses:
-        "201":
-          description: Created.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id: { type: integer, example: 1 }
-                  name: { type: string }
-                  capacity: { type: integer }
-                  price_cents: { type: integer }
-                required: [id, name, capacity, price_cents]
-        "400":
-          description: >
-            `name and capacity are required` (either is missing), `name must
-            not be empty`, `capacity must be a whole number of at least 1`,
-            or `price_cents must be a non-negative integer`.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-
-  /spaces/{spaceId}:
-    parameters:
-      - $ref: "#/components/parameters/SpaceId"
+                    items:
+                      $ref: '#/components/schemas/Space'
+              example:
+                spaces:
+                  - space_id: 1
+                    name: Meeting Room A
+                    capacity: 6
+                    hourly_rate_satang: 30000
+                    block_price_satang: 15000
+                    currency: THB
+                  - space_id: 4
+                    name: Community Table
+                    capacity: 8
+                    hourly_rate_satang: 0
+                    block_price_satang: 0
+                    currency: THB
+  /api/spaces/{space_id}/availability:
     get:
-      tags: [spaces]
-      summary: Get one space.
-      description: Same availability rule as `GET /spaces` - pass a window, or omit both params for "right now".
+      tags: [api]
+      operationId: getAvailability
+      security: []
+      summary: Start-block grid for one space, date and duration (24 starts, 08:00 to 19:30)
+      description: |
+        Reason is the first that applies: "Too soon", "Runs past 20:00", "Booked".
+        The example is 2026-10-07, 3 blocks, with BK-7KQ2M9 confirmed 09:00-10:30.
+        A read: never reconciles, never holds. Rules PUR-R08, PUR-R09, PUR-R10, PUR-R11, PUR-R12, PUR-R13.
       parameters:
-        - $ref: "#/components/parameters/StartTime"
-        - $ref: "#/components/parameters/EndTime"
-      responses:
-        "200":
-          description: The space.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Space" }
-        "400":
-          $ref: "#/components/responses/BadWindow"
-        "404":
-          $ref: "#/components/responses/SpaceNotFound"
-    patch:
-      tags: [spaces]
-      summary: Update a space.
-      description: >
-        Only the fields present in the body are changed; everything else
-        keeps its current value. Changing the price does not affect
-        bookings already made at the old price (see `amount_cents` on a
-        booking).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name: { type: string }
-                capacity: { type: integer, minimum: 1 }
-                price_cents: { type: integer, minimum: 0 }
-              minProperties: 1
-              example: { price_cents: 2000 }
-      responses:
-        "200":
-          description: The updated space.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Space" }
-        "400":
-          description: >
-            `provide name, capacity and/or price_cents to update` (empty
-            body), or the same per-field messages as `POST /spaces`.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "404":
-          $ref: "#/components/responses/SpaceNotFound"
-    delete:
-      tags: [spaces]
-      summary: Delete a space.
-      description: Refused while the space has any bookings, past or present - cancel them first.
-      responses:
-        "204":
-          description: Deleted.
-        "404":
-          $ref: "#/components/responses/SpaceNotFound"
-        "409":
-          description: The space still has bookings.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "space has bookings, cancel them first" }
-
-  /spaces/{spaceId}/bookings:
-    parameters:
-      - $ref: "#/components/parameters/SpaceId"
-    get:
-      tags: [bookings]
-      summary: List a space's bookings.
-      responses:
-        "200":
-          description: That space's bookings, earliest first.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BookingList" }
-        "404":
-          $ref: "#/components/responses/SpaceNotFound"
-    post:
-      tags: [bookings]
-      summary: Book a space.
-      description: >
-        Unpaid on creation, unless `member` has an active subscription (see
-        `POST /members/{name}/subscribe`), in which case it is created
-        already paid and costs nothing extra. A later `POST
-        /bookings/{bookingId}/pay` is needed otherwise, before `.../unlock`
-        will work.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                member:
-                  type: string
-                  default: guest
-                  description: >
-                    Defaults to `guest` if omitted - there is no
-                    requirement yet that a real name is given (issue #22).
-                  example: member-a
-                start_time:
-                  type: string
-                  format: date-time
-                  description: ISO 8601 with a timezone.
-                  example: "2026-09-25T09:00:00Z"
-                end_time:
-                  type: string
-                  format: date-time
-                  example: "2026-09-25T10:00:00Z"
-                party_size:
-                  type: integer
-                  minimum: 1
-                  default: 1
-                  description: Must not exceed the space's capacity.
-              required: [start_time, end_time]
-      responses:
-        "201":
-          description: Booked.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Booking" }
-        "400":
-          description: >
-            `start_time and end_time are required (ISO 8601 with
-            timezone)`, `end_time must be after start_time`, `party_size
-            must be a whole number of at least 1`, or `party_size {n}
-            exceeds this space's capacity of {capacity}`.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "404":
-          $ref: "#/components/responses/SpaceNotFound"
-        "409":
-          description: The space is already booked for an overlapping time.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "space is already booked for that time" }
-
-  /bookings:
-    get:
-      tags: [bookings]
-      summary: List every booking, across all spaces.
-      responses:
-        "200":
-          description: Every booking, earliest first.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BookingList" }
-
-  /bookings/{bookingId}:
-    parameters:
-      - $ref: "#/components/parameters/BookingId"
-    get:
-      tags: [bookings]
-      summary: Get one booking.
-      responses:
-        "200":
-          description: The booking.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Booking" }
-        "404":
-          $ref: "#/components/responses/BookingNotFound"
-    delete:
-      tags: [bookings]
-      summary: Cancel a booking.
-      description: >
-        Deletes the booking outright, whether or not it was paid - there is
-        no cancelled/refunded record kept yet (see issue #82).
-      responses:
-        "200":
-          description: The booking as it was just before it was deleted.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Booking" }
-        "404":
-          $ref: "#/components/responses/BookingNotFound"
-
-  /bookings/{bookingId}/pay:
-    post:
-      tags: [bookings]
-      summary: Pay for a booking (mocked).
-      description: >
-        No real payment provider or network - card details are checked for
-        shape only (right length, digits only, expiry not in the past),
-        not a real Luhn/network check (see issue #119). Only the card's
-        last 4 digits are ever stored or returned; the full number and CVC
-        are never persisted. Paying an already-paid booking is a no-op
-        (no card required for that retry), so a retried request can't
-        charge twice. Pass `force_failure: true` with a still-valid card
-        to make this attempt fail on purpose, for testing the failure
-        path - the booking is left unpaid.
-      parameters:
-        - $ref: "#/components/parameters/BookingId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                card_number:
-                  type: string
-                  description: Digits only, 13-19 characters.
-                  example: "4242424242424242"
-                expiry:
-                  type: string
-                  description: MM/YY, must not be in the past.
-                  example: "12/30"
-                cvc:
-                  type: string
-                  description: Digits only, 3-4 characters.
-                  example: "123"
-                force_failure:
-                  type: boolean
-                  default: false
-              required: [card_number, expiry, cvc]
-      responses:
-        "200":
-          description: Paid (or already was).
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Booking" }
-        "400":
-          description: >
-            `card_number must be 13-19 digits`, `cvc must be 3 or 4
-            digits`, `expiry must be in MM/YY format`, or `card has
-            expired`. Not returned when the booking is already paid.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "402":
-          description: Payment failed (only when `force_failure` was set).
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: payment failed }
-        "404":
-          $ref: "#/components/responses/BookingNotFound"
-
-  /bookings/{bookingId}/unlock:
-    post:
-      tags: [bookings]
-      summary: Get an access code for a paid booking (mocked lock).
-      parameters:
-        - $ref: "#/components/parameters/BookingId"
-      responses:
-        "200":
-          description: Unlocked.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  booking_id: { type: integer }
-                  access_code:
-                    type: string
-                    description: A random 8-character hex code. Not a real lock integration.
-                    example: 2847cae6
-                required: [booking_id, access_code]
-        "402":
-          description: The booking is not paid yet.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: booking is not paid }
-        "404":
-          $ref: "#/components/responses/BookingNotFound"
-
-  /members/{name}/subscribe:
-    post:
-      tags: [members]
-      summary: Subscribe a member (mocked).
-      description: >
-        No real provider and no price yet (see issue #112). Subscribing
-        again is a no-op: `started_at` does not change. The name is matched
-        trimmed and lower-cased, so "Member A" and " member-a " are the same
-        subscriber. While active, every booking that member makes is
-        created already paid, at no extra charge.
-      parameters:
-        - name: name
-          in: path
+        - $ref: '#/components/parameters/SpaceId'
+        - name: date
+          in: query
           required: true
-          schema: { type: string }
-          example: member-a
+          schema:
+            type: string
+            format: date
+          example: '2026-10-07'
+        - name: blocks
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8
+          example: 3
       responses:
-        "200":
-          description: Subscribed (or already was).
+        '200':
+          description: The grid
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  member:
-                    type: string
-                    description: Trimmed and lower-cased.
-                    example: member-a
-                  active: { type: boolean, example: true }
-                  started_at: { type: string, format: date-time }
-                required: [member, active, started_at]
-        "400":
-          description: The name is blank after trimming.
+                $ref: '#/components/schemas/Availability'
+              example:
+                space_id: 1
+                date: '2026-10-07'
+                blocks: 3
+                price_satang: 45000
+                currency: THB
+                starts:
+                  - {start: '2026-10-07T08:00:00+07:00', available: false, reason: Booked}
+                  - {start: '2026-10-07T08:30:00+07:00', available: false, reason: Booked}
+                  - {start: '2026-10-07T09:00:00+07:00', available: false, reason: Booked}
+                  - {start: '2026-10-07T09:30:00+07:00', available: false, reason: Booked}
+                  - {start: '2026-10-07T10:00:00+07:00', available: false, reason: Booked}
+                  - {start: '2026-10-07T10:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T11:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T11:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T12:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T12:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T13:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T13:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T14:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T14:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T15:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T15:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T16:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T16:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T17:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T17:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T18:00:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T18:30:00+07:00', available: true, reason: null}
+                  - {start: '2026-10-07T19:00:00+07:00', available: false, reason: 'Runs past 20:00'}
+                  - {start: '2026-10-07T19:30:00+07:00', available: false, reason: 'Runs past 20:00'}
+        '400':
+          description: Date outside today to today + 30, or blocks outside 1-8
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "member name must not be blank" }
-
-  /register:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: invalid_request
+                  message: Pick a date from today to 30 days ahead
+        '404':
+          $ref: '#/components/responses/NotFoundJson'
+  /api/bookings:
     post:
-      tags: [accounts]
-      summary: Create an account.
-      description: >
-        Also available as a plain HTML form at GET /register, for a browser.
-        Email is matched trimmed and lower-cased, and must be unique. The
-        password is hashed (werkzeug.security) and never stored or returned
-        as plain text.
+      tags: [api]
+      operationId: createBooking
+      summary: Create a booking, or resume the Member's own hold for the same space and time
+      description: |
+        Checks in order: shape (400: offset, :00 or :30, 1-8 blocks, opening hours); the Member's
+        own match (a slot-blocking hold of the same space, start and blocks: 200 with that booking,
+        or from its payment deadline 409 payment_time_over; a confirmed booking of the same space,
+        start and blocks: 200 with that booking); notice, horizon and party size (400); another held
+        booking (409 held_booking_exists); slot (409). A match answers with the stored booking and its
+        stored party size and note.
+        Pay: 201 held with payment_url. Plan or free: 201 confirmed, payment_url null, no Payment call.
+        Any amount_satang or extra field is ignored.
+        Rules PUR-R05, PUR-R07 to PUR-R14, PUR-R17, PUR-R19 to PUR-R23, PUR-R39, PUR-R40.
+      security:
+        - cookieAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
+              $ref: '#/components/schemas/BookingCreate'
+            examples:
+              standard:
+                value:
+                  space_id: 1
+                  start: '2026-10-07T09:00:00+07:00'
+                  blocks: 3
+                  party_size: 4
+                  note: Team planning
+              naive_start:
+                summary: Invalid on purpose, no offset; answers 400 invalid_request
+                value:
+                  space_id: 1
+                  start: '2026-10-07T09:00:00'
+                  blocks: 3
+                  party_size: 4
+              plan_member:
+                summary: Member B, plan_active true; coverage skips collection
+                value:
+                  space_id: 1
+                  start: '2026-10-07T10:30:00+07:00'
+                  blocks: 2
+                  party_size: 2
+      responses:
+        '201':
+          description: New booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              examples:
+                held_pay:
+                  $ref: '#/components/examples/BookingHeld'
+                plan_confirmed_no_payment_call:
+                  $ref: '#/components/examples/BookingPlan'
+        '200':
+          description: Resumed hold (double submit); same reference and payment_url. Or the Member's own confirmed booking of the same space, start and blocks; nothing new, no second grant request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              examples:
+                resumed:
+                  $ref: '#/components/examples/BookingHeld'
+                own_confirmed_booking:
+                  $ref: '#/components/examples/BookingConfirmed'
+        '400':
+          description: Naive, misaligned or out-of-hours time, bad duration, notice, horizon or party size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                naive:
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Time needs an offset, for example +07:00
+                misaligned:
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Start on :00 or :30
+                out_of_hours:
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Outside opening hours 08:00-20:00
+                too_soon:
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Book at least 60 minutes ahead
+                party_size:
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Party size must be 1 to 6
+        '401':
+          $ref: '#/components/responses/UnauthorizedJson'
+        '404':
+          $ref: '#/components/responses/NotFoundJson'
+        '409':
+          description: Another held booking, slot taken, or time to pay has run out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                held_booking_exists:
+                  value:
+                    error:
+                      code: held_booking_exists
+                      message: Finish or cancel your held booking BK-7KQ2M9 first
+                held_booking_after_deadline:
+                  summary: Another request after that hold's payment deadline
+                  value:
+                    error:
+                      code: held_booking_exists
+                      message: Time to pay has run out on BK-7KQ2M9; cancel it, or try again from 10:15
+                slot_taken:
+                  value:
+                    error:
+                      code: slot_taken
+                      message: Slot just taken
+                payment_time_over:
+                  value:
+                    error:
+                      code: payment_time_over
+                      message: Time to pay has run out; cancel this hold or book again from 10:15
+        '503':
+          $ref: '#/components/responses/PaymentUnreachable'
+  /api/bookings/mine:
+    get:
+      tags: [api]
+      operationId: listMyBookings
+      summary: The Member's bookings, ordered by start (held ones reconciled first)
+      description: Rules PUR-R05, PUR-R24, PUR-R28.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bookings]
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+              example:
+                bookings:
+                  - reference: BK-7KQ2M9
+                    status: confirmed
+                    completed: false
+                    space_id: 1
+                    space_name: Meeting Room A
+                    start: '2026-10-07T09:00:00+07:00'
+                    end: '2026-10-07T10:30:00+07:00'
+                    blocks: 3
+                    party_size: 4
+                    note: Team planning
+                    agreed_price_satang: 45000
+                    currency: THB
+                    coverage: pay
+                    hold_expires_at: '2026-10-05T10:15:00+07:00'
+                    payment_session_id: ps_Q7mZ3xK9vT2bN8rL4wYc1A
+                    payment_url: null
+                    payment_status: paid
+                    cancel_reason: null
+                    refund_reason: null
+                    refund_amount_satang: null
+                    refund_status: none
+                    refund_attempt: null
+                    grant_status: issued
+                    ticket_url: http://localhost:8003/t/q3Vt9XbLk2Rm8PzW4nHc7A
+        '401':
+          $ref: '#/components/responses/UnauthorizedJson'
+  /api/bookings/{ref}:
+    get:
+      tags: [api]
+      operationId: getBooking
+      summary: One booking (owner or operator); reconciles a held booking and retries pending follow-ups
+      description: Rules PUR-R05, PUR-R24, PUR-R25, PUR-R26, PUR-R28, PUR-R32.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '200':
+          description: The booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              examples:
+                held:
+                  $ref: '#/components/examples/BookingHeld'
+                confirmed:
+                  $ref: '#/components/examples/BookingConfirmed'
+                cancelled:
+                  $ref: '#/components/examples/BookingCancelled'
+        '401':
+          $ref: '#/components/responses/UnauthorizedJson'
+        '404':
+          $ref: '#/components/responses/NotFoundJson'
+  /api/bookings/{ref}/cancel:
+    post:
+      tags: [api]
+      operationId: cancelBooking
+      summary: Cancel a booking (the caller's role decides the policy)
+      description: |
+        Confirmed: Member before start, 100% at 24 h or more, else 0%; operator before end, 100%;
+        plan and free refund 0 with no Payment call. Held: Payment expire first.
+        A repeat on a cancelled booking returns it (200) and starts nothing new.
+        Rules PUR-R28, PUR-R30, PUR-R31, PUR-R32, PUR-R35.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        '200':
+          description: Cancelled (or already cancelled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              examples:
+                cancelled:
+                  $ref: '#/components/examples/BookingCancelled'
+        '401':
+          $ref: '#/components/responses/UnauthorizedJson'
+        '404':
+          $ref: '#/components/responses/NotFoundJson'
+        '409':
+          description: Started (Member), ended (operator), or the hold (or booking) already expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                booking_started:
+                  value:
+                    error:
+                      code: booking_started
+                      message: This booking has started; ask the operator
+                booking_ended:
+                  value:
+                    error:
+                      code: booking_ended
+                      message: This booking has ended
+                hold_expired:
+                  value:
+                    error:
+                      code: hold_expired
+                      message: This hold has already expired
+        '503':
+          $ref: '#/components/responses/PaymentUnreachable'
+  /register:
+    get:
+      tags: [pages]
+      operationId: registerPage
+      security: []
+      summary: Sign-up form
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+    post:
+      tags: [pages]
+      operationId: register
+      security: []
+      summary: Register a Member
+      description: |
+        Success 303 /login, flash "Registered. Please log in." Errors 303 /register with
+        "Email already registered", "Enter a valid email" (not ASCII, over 254 characters or not
+        like a@example.com), "Password must be at least 8 characters", "Display name is required"
+        or "Display name must be 1 to 50 letters, digits or spaces" (letters, marks, digits,
+        spaces and . ' - only, so no "@", brackets, control or bidi characters).
+        Rules PUR-R01, PUR-R04.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
               type: object
               properties:
-                email: { type: string, format: email, example: a@example.com }
+                email:
+                  type: string
+                  description: ASCII, at most 254 characters, like a@example.com; else the flash "Enter a valid email"
+                  example: a@example.com
+                display_name:
+                  type: string
+                  description: 1 to 50 letters, marks, digits, spaces and . ' - only; else the flashes above
+                  example: Member A
                 password:
                   type: string
-                  minLength: 8
-                  example: hunter22
-              required: [email, password]
+                  format: password
+                  description: At least 8 characters; else the flash "Password must be at least 8 characters"
       responses:
-        "201":
-          description: Registered.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/User" }
-        "400":
-          description: >
-            enter a valid email address, or password must be at least 8
-            characters.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "409":
-          description: That email is already registered.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "email is already registered" }
-
+        '303':
+          $ref: '#/components/responses/SeeOther'
   /login:
+    get:
+      tags: [pages]
+      operationId: loginPage
+      security: []
+      summary: Login form
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
     post:
-      tags: [accounts]
-      summary: Start a session.
-      description: >
-        Also available as a plain HTML form at GET /login. A wrong password
-        and an unknown email return the identical error, so a login attempt
-        can't be used to find out which emails are registered.
+      tags: [pages]
+      operationId: login
+      security: []
+      summary: Log in; sets purchase_session (HttpOnly, SameSite=Lax, 12 h absolute)
+      description: |
+        Success 303 to the local GET path kept by the login step (from the signed session,
+        built by Purchase from the refused route; used only if it starts with "/", its second
+        character is neither "/" nor "\", and it holds no control character; a refused POST on /bookings/<ref>/... keeps
+        /bookings/<ref>; the kept path survives POST /register), else /. The header then shows
+        the display name and the email, "Member A (a@example.com)". Error 303 /login with
+        "Invalid email or password". Rules PUR-R02, PUR-R03, PUR-R04, PUR-R05.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: a@example.com
+                password:
+                  type: string
+                  format: password
+      responses:
+        '303':
+          description: Redirect; on success Set-Cookie purchase_session
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /
+            Set-Cookie:
+              schema:
+                type: string
+              example: purchase_session=...; HttpOnly; Path=/; SameSite=Lax
+  /logout:
+    post:
+      tags: [pages]
+      operationId: logout
+      security: []
+      summary: Clear purchase_session; 303 / with "Logged out" (GET gets 405)
+      description: Rule PUR-R37.
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+  /:
+    get:
+      tags: [pages]
+      operationId: indexPage
+      security: []
+      summary: Spaces list with THB per hour and per 30 min
+      description: 'Empty: "No spaces to book yet." Rules PUR-R15, PUR-R16, PUR-R18.'
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+  /spaces/{space_id}:
+    get:
+      tags: [pages]
+      operationId: spacePage
+      security: []
+      summary: Space page with date, duration, price, party size, note and the start-block grid
+      description: |
+        The date and duration are a GET form to /spaces/<space_id> with a "Show starts" button.
+        Each start is <input type="radio" name="start" value="HH:MM">; unavailable ones are
+        disabled with a title giving the reason. Each label shows the range ("09:00-10:30")
+        and, when greyed, the reason as text ("19:00-20:30 (Runs past 20:00)"). One review line (room, date, duration, price,
+        and for pay the cancellation terms, plus "Starts less than 24 h away cannot be refunded."
+        when the date is today or tomorrow) and one submit button: "Continue to payment" (pay)
+        or "Book" (plan, free). Anonymous: the pay-coverage review (the free review with no refund line when
+        the rate is 0) and a "Log in to book" button;
+        the login step keeps this page with its date and blocks, and the start, party size and
+        note are chosen again after login (PUR-R05). A date outside the horizon or bad blocks: 303 back
+        to /spaces/<space_id> with a flash. Rules PUR-R05, PUR-R08 to PUR-R10, PUR-R13, PUR-R14, PUR-R17, PUR-R19.
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: '2026-10-07'
+        - name: blocks
+          in: query
+          required: false
+          description: 1 to 8; another value gets 303 with "Duration must be 1 to 8 blocks", never 400
+          schema:
+            type: integer
+            default: 1
+          example: 3
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /spaces/{space_id}/book:
+    post:
+      tags: [pages]
+      operationId: bookByForm
+      summary: Continue to payment (creates or resumes the hold) or book a plan or free slot
+      description: |
+        Pay: 303 to the Payment hosted page. Plan or free: 303 /bookings/<ref>, no Payment call.
+        Errors: 303 back to the space page with the flash ("Slot just taken",
+        "Finish or cancel your held booking BK-7KQ2M9 first" or, from that hold's payment deadline,
+        "Time to pay has run out on BK-7KQ2M9; cancel it, or try again from 10:15", input messages,
+        "Pick a start time" when no start was picked, "Note must be at most 500 characters",
+        "Payment is not reachable. Please try again."). Session create unreachable or time to
+        pay over: 303 /bookings/<ref> with the flash. Same space, start and blocks as the
+        Member's own confirmed booking: 303 to that booking with "You already booked this slot".
+        Anonymous: 303 /login "Log in to book", and after login back to the space page.
+        Rules PUR-R05, PUR-R07 to PUR-R14, PUR-R17, PUR-R19 to PUR-R23, PUR-R39, PUR-R40.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  description: YYYY-MM-DD, the date the grid was built for
+                  example: '2026-10-07'
+                start:
+                  type: string
+                  description: HH:MM on :00 or :30; missing gets "Pick a start time", misaligned "Pick a start on the half hour"
+                  example: '09:00'
+                blocks:
+                  type: integer
+                  description: 1 to 8, else "Duration must be 1 to 8 blocks"
+                  example: 3
+                party_size:
+                  type: integer
+                  description: 1 to the space's capacity, else "Party size must be 1 to 6" (with the capacity)
+                  example: 4
+                note:
+                  type: string
+                  description: Optional, at most 500 characters, else "Note must be at most 500 characters"
+                  example: Team planning
+      responses:
+        '303':
+          description: To the hosted page, the booking page, the space page or /login
+          headers:
+            Location:
+              schema:
+                type: string
+              example: http://localhost:8002/pay/ps_Q7mZ3xK9vT2bN8rL4wYc1A
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /bookings/mine:
+    get:
+      tags: [pages]
+      operationId: myBookingsPage
+      summary: My bookings, upcoming and past (Completed); held ones reconciled first
+      description: |
+        Upcoming (end after now) by start ascending, then past by start descending. A held row
+        shows "Pay by 10:13", from the payment deadline "Time to pay has run out on BK-7KQ2M9;
+        cancel it, or try again from 10:15", or "Payment status unknown" when its read got no
+        answer; a confirmed row shows "View e-ticket" (grant issued) or "E-ticket being prepared"
+        (grant pending). Empty: "No bookings yet" with a link to /. Rules PUR-R05, PUR-R24, PUR-R28.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+  /bookings/{ref}:
+    get:
+      tags: [pages]
+      operationId: bookingPage
+      summary: Booking page (owner or operator); also the cancel_url
+      description: |
+        Reconciles a held booking and retries pending grant, revoke and refund first.
+        States (contract section 7), held ones in this order: from the payment deadline no
+        "Continue to payment"; "Nothing was charged" only after an unpaid read or with no session.
+        Held: "Pay by 10:13 (N min left)" with data-seconds-left, "Continue to payment" and Cancel;
+        "Payment could not be started. Pay by 10:13"; before the deadline with no answer, the
+        countdown stays beside "Payment status unknown, refresh later. If you already paid, refresh
+        in a minute; otherwise Continue to payment by 10:13.";
+        from the deadline "Time to pay has run out. Nothing was charged. Cancel this hold to book
+        again now, or it ends at 10:15.", or with no answer "Payment status unknown. If you paid before
+        10:13, your booking will be confirmed: refresh in a minute.", with Cancel only. Confirmed pay: "Confirmed. Paid THB 450.00.", "Cancel by 2026-10-06 09:00 for a full
+        refund." or "No refund if you cancel: the start is less than 24 h away.", "View e-ticket"
+        or "Your e-ticket is being prepared". Confirmed plan or free: "Confirmed. Covered by your
+        plan. No payment was taken." or "Confirmed. This space is free. No payment was taken.",
+        "You can cancel until the start." Started: "This booking has started; ask the operator",
+        no Cancel. Completed, with "View e-ticket" and no Cancel. Expired: "Not paid in time. The
+        hold ended at 10:15 and nothing was charged." and "Book again"; or "Paid after the hold
+        ended." with its refund line. Cancelled (contract section 7 table, from stored fields):
+        line 1 "Cancelled.", "Cancelled by the operator.", "Cancelled: the payment did not match.",
+        "Cancelled before payment. Nothing was charged." or "Cancelled by the operator before
+        payment. Nothing was charged."; line 2 "No payment was taken.", "No refund: cancelled less
+        than 24 h before the start.", "THB 450.00 refunded." (only when refund_status is
+        succeeded), "Refund of THB 450.00 pending." or "Refund failed. The operator will follow
+        up."; line 3 while the revoke is pending "Your ticket is still being cancelled; any refund
+        follows." with no "View e-ticket"; once revoked, "View e-ticket" shows only when ticket_url is set. "View e-ticket" opens in a new tab. The owner and an
+        operator see "Party of 4" and the note; an operator also sees the Member. "Continue to
+        payment" and "Book again" (Expired, or cancelled while held) show only to the booking's
+        own Member; "Book again" keeps the booking's date only while it is inside the horizon and the space is
+        not archived (else /spaces/<space_id>, or / when archived). A Retry button (POST
+        /bookings/<ref>/retry) shows beside each pending line, never beside "Refund failed" for the
+        Member; an operator's Retry and Reconcile forms send return_to=booking and its Cancel link is
+        /bookings/<ref>/cancel?return_to=booking. Rules PUR-R05, PUR-R24, PUR-R26, PUR-R28, PUR-R32, PUR-R33, PUR-R40.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /bookings/{ref}/return:
+    get:
+      tags: [pages]
+      operationId: paymentReturn
+      summary: success_url; reconciles with the stored session id, then 303 /bookings/<ref>
+      description: |
+        The session_id query value is ignored. Anonymous (the login ended during payment):
+        303 /login, and after login back to /bookings/<ref>/return. Rules PUR-R03, PUR-R05,
+        PUR-R24, PUR-R25, PUR-R26.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+        - name: session_id
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ps_Q7mZ3xK9vT2bN8rL4wYc1A
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /bookings/{ref}/cancel:
+    get:
+      tags: [pages]
+      operationId: cancelConfirmPage
+      summary: Confirm screen showing the refund the policy gives
+      description: |
+        Reconciles a held booking first (PUR-R24). Names the booking ("Cancel BK-7KQ2M9, Meeting
+        Room A 2026-10-07 09:00-10:30", plus "Member A (a@example.com)" for an operator), then
+        "Refund THB 450.00 (100%)", "Refund THB 0.00 (0%)", "No payment was taken", or for a held
+        booking: before the payment deadline, read unpaid, "We have not received a payment for this
+        booking. Cancelling closes the payment page. If a payment completes first, the refund is
+        THB 450.00 (100%)." (an operator always sees 100% before the end); before the deadline with no answer "We could not
+        check your payment just now. If a payment completes or went through, the refund is THB 450.00 (100%)."; from the deadline, read unpaid,
+        "Nothing was charged. Cancel this hold?"; from the deadline with no answer "Payment status
+        unknown. If a payment went through, the refund is THB 450.00 (100%)."; no session "Payment
+        was not started. Nothing was charged. Cancel this hold?". The form carries
+        shown_refund_satang, the amount the screen names (0 for "Nothing was charged" and no
+        session), and posts to /bookings/<ref>/cancel, or for an operator to
+        /operator/bookings/<ref>/cancel; its button reads "Cancel booking" and a "Keep booking"
+        link goes back to /bookings/<ref>. Test marker: <form method="post" action="/bookings/<ref>/cancel"> (or
+        the operator action) holding <input type="hidden" name="shown_refund_satang" value="45000">,
+        the amount the screen names. A booking that cannot be cancelled: 303 /bookings/<ref>
+        with the flash a POST would get.
+        Rules PUR-R24, PUR-R30, PUR-R31.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+    post:
+      tags: [pages]
+      operationId: cancelByForm
+      summary: Cancel; 303 /bookings/<ref> with the outcome flashed
+      description: |
+        303 /bookings/<ref> with "Booking cancelled", "This hold has already expired" (also for an
+        already expired booking), "Payment is not reachable. Please try again.", "This booking has
+        started; ask the operator", "This booking has ended" or "This booking is already cancelled".
+        The shown_refund_satang check runs before any Payment or Access call: when the policy now
+        gives less, 303 /bookings/<ref>/cancel with "The refund is now THB 0.00 (0%): the start is
+        less than 24 h away. Confirm again."; when the field is missing or not an integer, 303
+        /bookings/<ref>/cancel with "Please confirm the refund again."; nothing cancelled either way.
+        Rules PUR-R30, PUR-R31, PUR-R32.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      requestBody:
+        $ref: '#/components/requestBodies/CancelForm'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /bookings/{ref}/retry:
+    post:
+      tags: [pages]
+      operationId: retryByForm
+      summary: Retry pending grant, revoke, refund (in that order); never starts attempt+1
+      description: |
+        Repeats pending steps exactly like opening the booking page, with one flash per step
+        tried: "E-ticket issued", "Grant revoked", "Refund attempt <n> succeeded" or "Refund
+        attempt <n> failed" (n is the stored pending attempt), "Access is not reachable. Please try
+        again." or "Payment is not reachable. Please try again."; with nothing pending, "Nothing to
+        retry" and no call. It never starts refund attempt+1, whoever calls it: an operator's
+        Retry on the booking page posts to /operator/bookings/<ref>/retry. Rules PUR-R26, PUR-R32, PUR-R33.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/bookings:
+    get:
+      tags: [operator]
+      operationId: operatorBookings
+      summary: All bookings, flagged first, with Cancel, Retry, Reconcile and "Reconcile all held"
+      description: |
+        Columns: reference, Member display name and email, space, date and time, status (held
+        rows read "held, pay by 10:13", "held, payment not started" or "held, hold ended 10:15
+        (Reconcile)"; a confirmed row past its end reads "Completed"), coverage, price, flags ("Being prepared", "Revocation pending", "Refund pending",
+        "Refund failed") and, beside a refund flag, "Refund requested 2026-10-05 11:00"; rows with
+        a refund owed sort oldest first. Cancel (held, or confirmed before the end) links to the
+        confirm screen GET /bookings/<ref>/cancel; Reconcile on held rows only. Each row carries
+        data-booking-reference and data-flags. Empty: "No bookings yet". Rules PUR-R06, PUR-R24.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/bookings/{ref}/cancel:
+    post:
+      tags: [operator]
+      operationId: operatorCancel
+      summary: Operator cancel before the end, always 100%; posted from the confirm screen
+      description: |
+        Success 303 /bookings/<ref> when the hidden return_to is booking (the screen was opened from
+        the booking page with ?return_to=booking), else /operator/bookings, "Booking cancelled". Checks in order: ownership, already
+        cancelled or expired, ended, the shown_refund_satang comparison, then the calls. The two
+        shown-refund refusals 303 /bookings/<ref>/cancel, as on cancelByForm; every other refusal
+        303 /bookings/<ref> with the flash of cancelByForm. Rules PUR-R06, PUR-R30, PUR-R32.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      requestBody:
+        $ref: '#/components/requestBodies/CancelForm'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/bookings/{ref}/retry:
+    post:
+      tags: [operator]
+      operationId: operatorRetry
+      summary: Retry pending steps; a stored failed refund gets attempt+1
+      description: |
+        A non-operator gets 404. One flash per step tried: "E-ticket issued", "Grant revoked",
+        "Refund attempt <n> succeeded", "Refund attempt <n> failed" (n is the attempt sent),
+        "Access is not reachable. Please try again." or "Payment is not reachable. Please try
+        again."; for any other 4xx answer "Payment refused the call (401): check the service
+        settings and the Purchase log." (or Access, with its status, PUR-R35); with no pending or
+        failed step, "Nothing to retry" and no call. 303 /bookings/<ref> when the hidden return_to is
+        booking (the booking page's form), else /operator/bookings. Rules PUR-R06, PUR-R32, PUR-R33, PUR-R35.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/bookings/{ref}/reconcile:
+    post:
+      tags: [operator]
+      operationId: operatorReconcile
+      summary: Reconcile one held booking; flash "1 confirmed, 0 expired, 0 cancelled, 0 unchanged"
+      description: A booking that is not held changes nothing and flashes "0 confirmed, 0 expired, 0 cancelled, 1 unchanged". 303 /bookings/<ref> when the hidden return_to is booking, else /operator/bookings. Rules PUR-R06, PUR-R24.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Ref'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/bookings/reconcile:
+    post:
+      tags: [operator]
+      operationId: operatorReconcileAll
+      summary: Reconcile all held; flash "1 confirmed, 1 expired, 0 cancelled, 1 unchanged"
+      description: |
+        Reconciles every held booking (with a session: the Payment read; without one: expired
+        once lapsed), then 303 to /dashboard when return_to is dashboard, else /operator/bookings;
+        the Referer header is never read. After the first read with no answer Purchase stops
+        calling Payment and counts the rest unchanged; the flash adds "Payment is not reachable.
+        Please try again." After the first POST /grants or POST /refunds with no answer no more of
+        that kind is sent in the request; after the first read answered with another 4xx it stops
+        reading and adds "Payment refused the call (401): check the service settings and the
+        Purchase log." Rules PUR-R06, PUR-R24, PUR-R34.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                return_to:
+                  type: string
+                  enum: [bookings, dashboard]
+                  description: The page the button sits on; anything else means bookings
+            example:
+              return_to: dashboard
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/spaces:
+    get:
+      tags: [operator]
+      operationId: operatorSpaces
+      summary: Every space with create, edit and archive forms
+      description: Archived spaces are listed last, marked "Archived 2026-10-07", with no edit or archive form. Rules PUR-R06, PUR-R15, PUR-R16.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+    post:
+      tags: [operator]
+      operationId: createSpace
+      summary: Create a space; 303 /operator/spaces with "Space saved" or the error flash
+      description: Errors, the first failing check in this order, "Name is required", "Name already used" (another non-archived space), "Capacity must be a whole number from 1 to 1,000", "Rate must be 0 or 20 to 10,000 THB per hour"; typed values are not kept. Rule PUR-R15.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SpaceForm'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/spaces/{space_id}:
+    post:
+      tags: [operator]
+      operationId: editSpace
+      summary: Edit a space; existing bookings keep their price and party size
+      description: An archived space gets 404 (PUR-Q13). Rules PUR-R14, PUR-R15, PUR-R16, PUR-R17.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SpaceForm'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/spaces/{space_id}/archive:
+    post:
+      tags: [operator]
+      operationId: archiveSpace
+      summary: 'Archive; refused with "Cancel its upcoming bookings first: BK-7KQ2M9" (each blocking reference, held ones marked "(held)") while a held or confirmed booking ends after now'
+      description: A repeat for a space already archived answers 303 with "Space archived" and leaves archived_at unchanged. Rule PUR-R16.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/members:
+    get:
+      tags: [operator]
+      operationId: operatorMembers
+      summary: Members with plan_active and a plan button
+      description: |
+        Each Member row is <form method="post" action="/operator/members/<member_id>/plan"
+        data-member-email="b@example.com" data-plan-active="false">. Rules PUR-R06, PUR-R19.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /operator/members/{member_id}/plan:
+    post:
+      tags: [operator]
+      operationId: setPlan
+      summary: Set plan_active to the value sent; the button sends the target value
+      description: |
+        The button sends plan_active=true when the plan is off and false when it is on, so a
+        repeat (a double click) changes nothing. Flash "Plan on for b@example.com" or "Plan off
+        for b@example.com", the latter followed by "; upcoming plan bookings: BK-3MZ8QT" when the
+        Member has upcoming confirmed plan bookings (they stay plan). A missing or other plan_active value gets 303 with "Plan must be true
+        or false" and no change; there is no toggle. Only bookings created afterwards see the
+        change. Rules PUR-R06, PUR-R19.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: member_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 18
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                plan_active:
+                  type: string
+                  description: The target value, 'true' or 'false'; anything else gets "Plan must be true or false"
+            examples:
+              plan_on:
+                summary: The button on a row whose plan is off
+                value:
+                  plan_active: 'true'
+      responses:
+        '303':
+          $ref: '#/components/responses/SeeOther'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /dashboard:
+    get:
+      tags: [operator]
+      operationId: dashboard
+      summary: Last 7 Bangkok days - bookings by status, utilization, counted members, hours by coverage; no money
+      description: |
+        Stored statuses: a lapsed hold counts as held until reconciled; a "Reconcile all held"
+        button posts to /operator/bookings/reconcile with return_to=dashboard. Markers, always
+        present, 0 when empty: data-utilization (ratio, always 4 decimals, "0.0000"), data-members,
+        data-status-count-<status> (integers), data-hours-<coverage> (shortest decimal, "2", "1.5",
+        "0"). No non-archived space: utilization "0.0%", never a 500. Rules PUR-R06, PUR-R34.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Html'
+        '303':
+          $ref: '#/components/responses/LoginRedirect'
+        '404':
+          $ref: '#/components/responses/NotFoundHtml'
+  /health:
+    get:
+      tags: [ops]
+      operationId: health
+      security: []
+      summary: Liveness with the deployed revision
+      responses:
+        '200':
+          description: Database reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                revision: 3f9c2e1
+        '503':
+          description: Database unreachable. /health keeps the seed shape, not the standard error object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: error
+                error: database unreachable
+  /_test/clock:
+    post:
+      tags: [ops]
+      operationId: setTestClock
+      security: []
+      summary: Set or clear the test clock (404 unless TEST_CLOCK_ENABLED=true)
+      description: Rule PUR-R38. The e2e suite sets the same instant on all three services.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email: { type: string, format: email }
-                password: { type: string }
-              required: [email, password]
+              $ref: '#/components/schemas/Clock'
+            examples:
+              set:
+                value:
+                  now: '2026-10-05T10:15:00+07:00'
+              clear:
+                value:
+                  now: null
       responses:
-        "200":
-          description: Logged in.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/User" }
-        "401":
-          description: Wrong password, or no account with that email.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "invalid email or password" }
-
-  /logout:
-    post:
-      tags: [accounts]
-      summary: End the session.
-      description: Idempotent - logging out when already logged out does nothing.
-      responses:
-        "200":
-          description: Logged out (or already was).
+        '200':
+          description: Override stored (or cleared with null)
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-
-  /metrics:
-    get:
-      tags: [operations]
-      summary: Business metrics, as JSON.
-      description: The same numbers shown on `/dashboard`, for machine consumption.
-      responses:
-        "200":
-          description: Current totals.
+                $ref: '#/components/schemas/Clock'
+              example:
+                now: '2026-10-05T10:15:00+07:00'
+        '400':
+          description: A now that is not ISO 8601 with an offset; nothing stored
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  spaces: { type: integer }
-                  bookings:
-                    type: integer
-                    description: paid_bookings + unpaid_bookings.
-                  paid_bookings: { type: integer }
-                  unpaid_bookings: { type: integer }
-                  members:
-                    type: integer
-                    description: Distinct member strings that have ever booked.
-                  revenue_cents:
-                    type: integer
-                    description: >
-                      Sum of amount_cents across paid bookings only - the
-                      price each was actually charged at booking time, not
-                      today's space price.
-                  utilization:
-                    type: number
-                    description: >
-                      Booked hours over the next 7 days as a share of
-                      available hours (spaces x 7 x 24), 0 if there are no
-                      spaces. Counts every booking regardless of paid
-                      status - this measures usage, not revenue.
-                    example: 0.15
-                  repeat_member_rate:
-                    type: number
-                    description: >
-                      Share of members (by the free-text member string,
-                      see issue #86) with more than one booking, 0 if
-                      there are no bookings.
-                    example: 0.25
-                  payment_conversion:
-                    type: number
-                    description: Share of bookings that were paid, 0 if there are no bookings.
-                    example: 0.67
-                  avg_revenue_cents_per_paid_booking:
-                    type: integer
-                    description: revenue_cents divided by paid_bookings, rounded; 0 if none are paid.
-                    example: 1500
-                  revenue_by_space:
-                    type: array
-                    description: One row per space, even one with no bookings at all.
-                    items:
-                      type: object
-                      properties:
-                        id: { type: integer }
-                        name: { type: string }
-                        revenue_cents: { type: integer }
-                      required: [id, name, revenue_cents]
-                required:
-                  [
-                    spaces, bookings, paid_bookings, unpaid_bookings, members,
-                    revenue_cents, utilization, repeat_member_rate,
-                    payment_conversion, avg_revenue_cents_per_paid_booking,
-                    revenue_by_space,
-                  ]
-
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: invalid_request
+                  message: now must be ISO 8601 with an offset
+        '404':
+          description: TEST_CLOCK_ENABLED is not exactly "true"; nothing stored. With the flag off, clock.now() never reads test_clock
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: purchase_session
+      description: Set by POST /login; HttpOnly, SameSite=Lax, Secure on https; ends 12 h after login.
   parameters:
     SpaceId:
-      name: spaceId
+      name: space_id
       in: path
       required: true
-      schema: { type: integer }
+      schema:
+        type: integer
+        minimum: 1
       example: 1
-    BookingId:
-      name: bookingId
+    Ref:
+      name: ref
       in: path
       required: true
-      schema: { type: integer }
-      example: 1
-    StartTime:
-      name: start_time
-      in: query
-      required: false
-      description: Required together with end_time; ISO 8601 with a timezone.
-      schema: { type: string, format: date-time }
-      example: "2026-09-25T09:00:00Z"
-    EndTime:
-      name: end_time
-      in: query
-      required: false
-      description: Required together with start_time; must be after it.
-      schema: { type: string, format: date-time }
-      example: "2026-09-25T10:00:00Z"
-
-  responses:
-    SpaceNotFound:
-      description: No space with that id.
+      description: Any unknown reference, well-formed or not, gets 404, never 400 (no pattern here on purpose)
+      schema:
+        type: string
+      example: BK-7KQ2M9
+  requestBodies:
+    CancelForm:
+      required: true
       content:
-        application/json:
-          schema: { $ref: "#/components/schemas/Error" }
-          example: { error: "space not found" }
-    BookingNotFound:
-      description: No booking with that id.
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/Error" }
-          example: { error: "booking not found" }
-    BadWindow:
-      description: >
-        start_time/end_time were not given together, aren't valid ISO 8601
-        with a timezone, or end_time is not after start_time.
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+        application/x-www-form-urlencoded:
+          schema:
+            type: object
+            properties:
+              shown_refund_satang:
+                type: integer
+                description: The refund the confirm screen showed; missing or not an integer gets 303 /bookings/<ref>/cancel with "Please confirm the refund again."
           example:
-            error: >-
-              start_time and end_time must be given together (ISO 8601 with
-              timezone, e.g. 2026-09-25T09:00:00Z)
-
+            shown_refund_satang: 45000
+  responses:
+    Html:
+      description: HTML page
+      content:
+        text/html:
+          schema:
+            type: string
+    SeeOther:
+      description: Post, redirect, get; the outcome is a one-time flashed message on the next page
+      headers:
+        Location:
+          schema:
+            type: string
+          example: /bookings/BK-7KQ2M9
+    LoginRedirect:
+      description: Anonymous, or a login that has ended (12 h); 303 /login with "Log in to book", "Please log in" or, for an ended login, "Please log in again"
+      headers:
+        Location:
+          schema:
+            type: string
+          example: /login
+    NotFoundHtml:
+      description: Unknown, not yours, archived space, or not an operator
+      content:
+        text/html:
+          schema:
+            type: string
+    UnauthorizedJson:
+      description: No valid purchase_session; nothing looked up. The message is "Please log in", or "Please log in again" for an ended login (PUR-R03)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: unauthorized
+              message: Please log in
+    NotFoundJson:
+      description: Unknown, not yours, or archived space; the same body in every case
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: not_found
+              message: Not found
+    PaymentUnreachable:
+      description: Payment gave no answer within 5 s (or a 5xx) and the request needs it; nothing changes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: payment_unreachable
+              message: Payment is not reachable. Please try again.
   schemas:
     Error:
       type: object
-      properties:
-        error: { type: string }
       required: [error]
-
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid_request, unauthorized, not_found, slot_taken, held_booking_exists, payment_time_over, booking_started, booking_ended, hold_expired, payment_unreachable]
+            message:
+              type: string
     Space:
       type: object
+      required: [space_id, name, capacity, hourly_rate_satang, block_price_satang, currency]
       properties:
-        id: { type: integer, example: 1 }
-        name: { type: string, example: Founders Desk }
-        capacity: { type: integer, example: 1 }
-        price_cents:
+        space_id:
           type: integer
-          example: 2500
-          description: Per-hour rate in cents.
-        available:
-          type: boolean
-          description: >
-            Whether the space is free right now, or for the requested
-            start_time/end_time window if one was given.
-      required: [id, name, capacity, price_cents, available]
-
-    Booking:
-      type: object
-      properties:
-        id: { type: integer, example: 1 }
-        space_id: { type: integer, example: 1 }
-        member: { type: string, example: member-a }
-        paid: { type: boolean }
-        start_time: { type: string, format: date-time, example: "2026-09-25T02:00:00+00:00" }
-        end_time: { type: string, format: date-time, example: "2026-09-25T03:00:00+00:00" }
-        amount_cents:
-          type: integer
-          description: >
-            What this booking was actually charged: the space's per-hour
-            rate times the hours booked, fixed at the price when it was
-            made (see issue #78) - a later price change does not affect
-            it. 0 for a subscriber's booking.
-          example: 1500
-        user_id:
-          type: integer
-          nullable: true
-          description: >
-            The account that was logged in when the booking was made (see
-            issue #134), or null for a guest booking made while logged out.
-          example: 1
-        card_last4:
+        name:
           type: string
-          nullable: true
-          description: >
-            The last 4 digits of the card used to pay (see issue #119).
-            Null until the booking is paid; the full card number and CVC
-            are never stored or returned.
-          example: "4242"
-        created_at:
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        hourly_rate_satang:
+          type: integer
+          format: int64
+          description: 0, or 2000 to 1000000 (whole THB 20 to 10,000)
+        block_price_satang:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          enum: [THB]
+    SpaceForm:
+      type: object
+      description: Checked in order name, capacity, rate; each failure gets 303 with its flash, never 400
+      properties:
+        name:
+          type: string
+          description: Not blank and not used by another non-archived space
+          example: Meeting Room A
+        capacity:
+          type: integer
+          description: A whole number from 1 to 1000
+          example: 6
+        hourly_rate:
+          type: integer
+          description: Whole THB per hour, 0 or 20 to 10000; stored in satang
+          example: 300
+    Availability:
+      type: object
+      required: [space_id, date, blocks, price_satang, currency, starts]
+      properties:
+        space_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        blocks:
+          type: integer
+        price_satang:
+          type: integer
+          format: int64
+          description: The price for this duration at today's rate
+        currency:
+          type: string
+          enum: [THB]
+        starts:
+          type: array
+          minItems: 24
+          maxItems: 24
+          items:
+            type: object
+            required: [start, available, reason]
+            properties:
+              start:
+                type: string
+                format: date-time
+              available:
+                type: boolean
+              reason:
+                type: string
+                enum: [Too soon, 'Runs past 20:00', Booked, null]
+                nullable: true
+    BookingCreate:
+      type: object
+      required: [space_id, start, blocks, party_size]
+      properties:
+        space_id:
+          type: integer
+        start:
           type: string
           format: date-time
-          description: >
-            When the booking was made (see issue #138) - not when the space
-            is used, which is start_time. Set by the database.
-          example: "2026-09-24T02:48:20.933270+00:00"
-      required: [id, space_id, member, paid, start_time, end_time, amount_cents, user_id, card_last4, created_at]
-
-    User:
+          description: ISO 8601 with an offset; :00 or :30 Bangkok time; no seconds
+        blocks:
+          type: integer
+          minimum: 1
+          maximum: 8
+        party_size:
+          type: integer
+          minimum: 1
+          description: At most the space's capacity
+        note:
+          type: string
+          maxLength: 500
+          description: At most 500 characters, else 400 "Note must be at most 500 characters"
+    Booking:
       type: object
+      required: [reference, status, completed, space_id, space_name, start, end, blocks, party_size, note, agreed_price_satang, currency, coverage, hold_expires_at, payment_session_id, payment_url, payment_status, cancel_reason, refund_reason, refund_amount_satang, refund_status, refund_attempt, grant_status, ticket_url]
       properties:
-        id: { type: integer, example: 1 }
-        email: { type: string, format: email, example: a@example.com }
-      required: [id, email]
-
-    BookingList:
+        reference:
+          type: string
+          pattern: '^BK-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{6}$'
+        status:
+          type: string
+          enum: [held, confirmed, expired, cancelled]
+        completed:
+          type: boolean
+          description: Derived; true when confirmed and now is at or after end
+        space_id:
+          type: integer
+        space_name:
+          type: string
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+          description: Exclusive
+        blocks:
+          type: integer
+        party_size:
+          type: integer
+        note:
+          type: string
+          nullable: true
+        agreed_price_satang:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          enum: [THB]
+        coverage:
+          type: string
+          enum: [pay, plan, free]
+        hold_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set for pay bookings at creation and kept after the hold ends; null for plan and free
+        payment_session_id:
+          type: string
+          nullable: true
+        payment_url:
+          type: string
+          format: uri
+          nullable: true
+          description: The hosted page; only while held with a session
+        payment_status:
+          type: string
+          enum: [not_required, unpaid, paid]
+          description: The last payment status Purchase read (PUR-T34 payment outcome)
+        cancel_reason:
+          type: string
+          enum: [member_cancel, operator_cancel, amount_mismatch, null]
+          nullable: true
+        refund_reason:
+          type: string
+          enum: [member_cancel, operator_cancel, amount_mismatch, slot_unavailable, null]
+          nullable: true
+        refund_amount_satang:
+          type: integer
+          format: int64
+          nullable: true
+        refund_status:
+          type: string
+          enum: [none, pending, succeeded, failed]
+          description: A 0% cancel and a plan or free cancel keep none
+        refund_attempt:
+          type: integer
+          nullable: true
+          description: Null while refund_status is none
+        grant_status:
+          type: string
+          enum: [not_requested, pending, issued, revoke_pending, revoked]
+        ticket_url:
+          type: string
+          format: uri
+          nullable: true
+    Health:
       type: object
+      required: [status]
       properties:
-        bookings:
-          type: array
-          items: { $ref: "#/components/schemas/Booking" }
-      required: [bookings]
+        status:
+          type: string
+          enum: [ok, error]
+        revision:
+          type: string
+        error:
+          type: string
+    Clock:
+      type: object
+      required: [now]
+      properties:
+        now:
+          type: string
+          format: date-time
+          nullable: true
+  examples:
+    BookingHeld:
+      value:
+        reference: BK-7KQ2M9
+        status: held
+        completed: false
+        space_id: 1
+        space_name: Meeting Room A
+        start: '2026-10-07T09:00:00+07:00'
+        end: '2026-10-07T10:30:00+07:00'
+        blocks: 3
+        party_size: 4
+        note: Team planning
+        agreed_price_satang: 45000
+        currency: THB
+        coverage: pay
+        hold_expires_at: '2026-10-05T10:15:00+07:00'
+        payment_session_id: ps_Q7mZ3xK9vT2bN8rL4wYc1A
+        payment_url: http://localhost:8002/pay/ps_Q7mZ3xK9vT2bN8rL4wYc1A
+        payment_status: unpaid
+        cancel_reason: null
+        refund_reason: null
+        refund_amount_satang: null
+        refund_status: none
+        refund_attempt: null
+        grant_status: not_requested
+        ticket_url: null
+    BookingConfirmed:
+      value:
+        reference: BK-7KQ2M9
+        status: confirmed
+        completed: false
+        space_id: 1
+        space_name: Meeting Room A
+        start: '2026-10-07T09:00:00+07:00'
+        end: '2026-10-07T10:30:00+07:00'
+        blocks: 3
+        party_size: 4
+        note: Team planning
+        agreed_price_satang: 45000
+        currency: THB
+        coverage: pay
+        hold_expires_at: '2026-10-05T10:15:00+07:00'
+        payment_session_id: ps_Q7mZ3xK9vT2bN8rL4wYc1A
+        payment_url: null
+        payment_status: paid
+        cancel_reason: null
+        refund_reason: null
+        refund_amount_satang: null
+        refund_status: none
+        refund_attempt: null
+        grant_status: issued
+        ticket_url: http://localhost:8003/t/q3Vt9XbLk2Rm8PzW4nHc7A
+    BookingCancelled:
+      summary: Member A cancelled at 2026-10-05 11:00, 46 h before start
+      value:
+        reference: BK-7KQ2M9
+        status: cancelled
+        completed: false
+        space_id: 1
+        space_name: Meeting Room A
+        start: '2026-10-07T09:00:00+07:00'
+        end: '2026-10-07T10:30:00+07:00'
+        blocks: 3
+        party_size: 4
+        note: Team planning
+        agreed_price_satang: 45000
+        currency: THB
+        coverage: pay
+        hold_expires_at: '2026-10-05T10:15:00+07:00'
+        payment_session_id: ps_Q7mZ3xK9vT2bN8rL4wYc1A
+        payment_url: null
+        payment_status: paid
+        cancel_reason: member_cancel
+        refund_reason: member_cancel
+        refund_amount_satang: 45000
+        refund_status: succeeded
+        refund_attempt: 1
+        grant_status: revoked
+        ticket_url: http://localhost:8003/t/q3Vt9XbLk2Rm8PzW4nHc7A
+    BookingPlan:
+      summary: Member B, coverage plan; no call is made to Payment
+      value:
+        reference: BK-3MZ8QT
+        status: confirmed
+        completed: false
+        space_id: 1
+        space_name: Meeting Room A
+        start: '2026-10-07T10:30:00+07:00'
+        end: '2026-10-07T11:30:00+07:00'
+        blocks: 2
+        party_size: 2
+        note: null
+        agreed_price_satang: 30000
+        currency: THB
+        coverage: plan
+        hold_expires_at: null
+        payment_session_id: null
+        payment_url: null
+        payment_status: not_required
+        cancel_reason: null
+        refund_reason: null
+        refund_amount_satang: null
+        refund_status: none
+        refund_attempt: null
+        grant_status: issued
+        ticket_url: http://localhost:8003/t/Zk7Pq2Wn9Tb4Xm6Rc3Lv8H
