@@ -17,9 +17,9 @@ import access_client
 import clock
 import payment_client
 from payment_client import CallFailed
-from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, grid, hours_text,
-                      money, new_reference, price_satang, refund_policy, shape_error, today,
-                      window_error)
+from purchase import (BKK, BLOCK, HOLD, PAY_MARGIN, date_in_horizon, duration_text, fdate, grid,
+                      hours_text, money, month, new_reference, price_satang, refund_policy, shape_error,
+                      today, window_error)
 
 log = logging.getLogger(__name__)
 SESSION_HOURS = 12
@@ -528,6 +528,22 @@ def valid_email(email: str) -> bool:
             and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None)
 
 
+SUCCESS_FLASHES = ("Registered.", "Logged out", "Booking cancelled", "Space saved", "Space archived",
+                   "E-ticket issued", "Grant revoked", "Plan on ", "Plan off ")
+INFO_FLASHES = ("Please log in", "Log in to book", "You already booked", "This booking is already cancelled",
+                "Nothing to retry")
+
+
+def flash_kind(message: str) -> str:
+    """Display style of a flash (PUR-R36): success, info or error. Only the look depends on it."""
+    # ponytail: go() flashes plain strings, so the look is read from the text; flash categories if this grows.
+    if message.startswith(SUCCESS_FLASHES) or re.fullmatch(r"Refund attempt \d+ succeeded", message):
+        return "success"
+    if message.startswith(INFO_FLASHES) or re.match(r"\d+ confirmed, ", message):
+        return "info"
+    return "error"
+
+
 def safe_next(path) -> str:
     if (isinstance(path, str) and path.startswith("/") and path[1:2] not in ("/", "\\")
             and not any(ord(c) < 32 or ord(c) == 127 for c in path)):
@@ -552,6 +568,9 @@ def create_app(database_url: str | None = None) -> Flask:
     app.add_template_filter(hhmm, "hhmm")
     app.add_template_filter(money, "money")
     app.add_template_filter(duration_text, "duration")
+    app.add_template_filter(fdate, "fdate")
+    app.add_template_filter(hours_text, "hours")
+    app.add_template_filter(flash_kind, "flash_kind")
 
     @app.before_request
     def load_member():

@@ -1,4 +1,5 @@
 """Purchase rules that need no database: price, blocks, grid, refund policy, references."""
+import calendar
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -72,6 +73,20 @@ def grid(day: date, blocks: int, now: datetime, busy: list[tuple[datetime, datet
     return rows
 
 
+def month(selected: date, now: datetime) -> dict:
+    """The month of `selected` as Monday-first weeks for the calendar; days outside the horizon (PUR-R10)
+    are not bookable. prev/next are the first bookable day of the neighbouring month, or None."""
+    lo, hi = today(now), today(now) + timedelta(days=HORIZON_DAYS)
+    first = selected.replace(day=1)
+    lead, n = calendar.monthrange(first.year, first.month)
+    nxt = first + timedelta(days=n)
+    days = [first + timedelta(days=i) for i in range(n)]
+    cells = [None] * lead + [{"date": d, "bookable": lo <= d <= hi} for d in days]
+    cells += [None] * (-len(cells) % 7)
+    prev = max((first - timedelta(days=1)).replace(day=1), lo) if first > lo else None
+    return {"first": first, "days": cells, "prev": prev, "next": nxt if nxt <= hi else None}
+
+
 def refund_policy(coverage: str, price: int, start: datetime, now: datetime, by_operator: bool) -> int:
     """PUR-R30 / D18: plan and free refund 0; operator 100%; Member 100% at 24 h or more, else 0."""
     if coverage != "pay":
@@ -91,6 +106,14 @@ def hours_text(hours: float) -> str:
     return f"{hours:.1f}".rstrip("0").rstrip(".")
 
 
+def fdate(value, style: str = "short") -> str:
+    """Bangkok dates in words: long "Thursday, 7 October", short "Wed 7 Oct", full "Wed 7 Oct 2026"."""
+    d = value.astimezone(BKK).date() if isinstance(value, datetime) else value
+    return {"long": f"{d:%A}, {d.day} {d:%B}", "full": f"{d:%a} {d.day} {d:%b} {d.year}",
+            "longyear": f"{d:%A}, {d.day} {d:%B} {d.year}", "day": str(d.day),
+            "month": f"{d:%B} {d.year}", "dow": f"{d:%a}", "mon": f"{d:%b}"}.get(style, f"{d:%a} {d.day} {d:%b}")
+
+
 def duration_text(blocks: int) -> str:
     h, m = divmod(blocks * 30, 60)
     return " ".join(p for p in (f"{h} h" if h else "", f"{m} min" if m else "") if p)
@@ -99,4 +122,5 @@ def duration_text(blocks: int) -> str:
 if __name__ == "__main__":
     assert price_satang(30000, 3) == 45000 and price_satang(2000, 1) == 1000
     assert money(123450) == "THB 1,234.50" and hours_text(1.5) == "1.5" and hours_text(2) == "2"
+    assert fdate(date(2026, 10, 7), "long") == "Wednesday, 7 October" and fdate(date(2026, 10, 7)) == "Wed 7 Oct"
     print("ok")
